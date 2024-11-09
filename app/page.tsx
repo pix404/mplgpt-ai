@@ -1,18 +1,14 @@
 "use client";
 
-import Logo from "@/components/logo";
-import Spinner from "@/components/spinner";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Switch } from "@/components/ui/switch";
-import { Textarea } from "@/components/ui/textarea";
-import ImageActions from "@/components/ImageActions";
-import NFTProgress from "@/components/NFTProgress";
-import imagePlaceholder from "@/public/image-placeholder.png";
 import { useQuery } from "@tanstack/react-query";
 import { useDebounce } from "@uidotdev/usehooks";
 import Image from "next/image";
 import { useEffect, useState } from "react";
+import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
+import { Textarea } from "@/components/ui/textarea";
+import { NFTProgress } from "@/components/NFTProgress";
+import imagePlaceholder from "@/public/image-placeholder.png";
 
 type ImageResponse = {
   b64_json: string;
@@ -25,8 +21,6 @@ export default function Home() {
   const [userAPIKey, setUserAPIKey] = useState("");
   const [isGeneratingCollection, setIsGeneratingCollection] = useState(false);
   const [generatedNFTs, setGeneratedNFTs] = useState(0);
-  const TOTAL_NFTS = 10000;
-  
   const debouncedPrompt = useDebounce(prompt, 300);
   const [generations, setGenerations] = useState<
     { prompt: string; image: ImageResponse }[]
@@ -64,43 +58,41 @@ export default function Home() {
     }
   }, [generations, image, prompt]);
 
-  const handleGenerateCollection = async () => {
+  let activeImage =
+    activeIndex !== undefined ? generations[activeIndex].image : undefined;
+
+  const handleGenerateCollection = () => {
     setIsGeneratingCollection(true);
-    // Simulate NFT generation - replace with actual generation logic
-    for (let i = 0; i < TOTAL_NFTS; i += 100) {
-      await new Promise(resolve => setTimeout(resolve, 100));
-      setGeneratedNFTs(Math.min(i + 100, TOTAL_NFTS));
-    }
+    // Simulate NFT generation progress
+    let count = 0;
+    const interval = setInterval(() => {
+      count++;
+      setGeneratedNFTs(count);
+      if (count >= 10000) {
+        clearInterval(interval);
+      }
+    }, 10);
   };
 
-  const handleConfirmCollection = () => {
-    // Create and download zip file
-    // This is a placeholder - implement actual zip creation and download
-    alert("Collection download started!");
+  const handleDownloadCollection = () => {
+    // Implement download logic here
+    console.log("Downloading collection...");
     setIsGeneratingCollection(false);
     setGeneratedNFTs(0);
   };
-
-  const handleDeleteImage = (index: number) => {
-    setGenerations(prev => prev.filter((_, i) => i !== index));
-    if (activeIndex === index) {
-      setActiveIndex(undefined);
-    }
-  };
-
-  const handleCopyPrompt = (prompt: string) => {
-    navigator.clipboard.writeText(prompt);
-  };
-
-  let activeImage =
-    activeIndex !== undefined ? generations[activeIndex].image : undefined;
 
   return (
     <div className="flex h-full flex-col px-5">
       <header className="flex justify-center pt-20 md:justify-end md:pt-3">
         <div className="absolute left-1/2 top-6 -translate-x-1/2">
-          <a href="https://www.mplgpt.ai" target="_blank">
-            <Logo />
+          <a href="https://mplgpt.ai" target="_blank">
+            <Image
+              src="/logo.svg"
+              alt="MPLGPT.AI"
+              width={128}
+              height={128}
+              priority
+            />
           </a>
         </div>
         <div>
@@ -131,7 +123,7 @@ export default function Home() {
               <Textarea
                 rows={4}
                 spellCheck={false}
-                placeholder="Describe your NFT collection..."
+                placeholder="Describe your image..."
                 required
                 value={prompt}
                 onChange={(e) => setPrompt(e.target.value)}
@@ -140,7 +132,7 @@ export default function Home() {
               <div
                 className={`${isFetching || isDebouncing ? "flex" : "hidden"} absolute bottom-3 right-3 items-center justify-center`}
               >
-                <Spinner className="size-4" />
+                <div className="size-4 animate-spin rounded-full border-2 border-gray-300 border-t-transparent"></div>
               </div>
             </div>
 
@@ -164,11 +156,11 @@ export default function Home() {
         {!activeImage || !prompt ? (
           <div className="max-w-xl md:max-w-4xl lg:max-w-3xl">
             <p className="text-xl font-semibold text-gray-200 md:text-3xl lg:text-4xl">
-              Generate Metaplex NFT collections in real-time
+              Generate NFT collections in real-time
             </p>
             <p className="mt-4 text-balance text-sm text-gray-300 md:text-base lg:text-lg">
-              Describe your NFT collection and generate variations in milliseconds as you type.
-              Once satisfied, generate your entire 10k collection with one click.
+              Enter a prompt and generate images in milliseconds as you type.
+              Then generate your entire NFT collection with one click.
             </p>
           </div>
         ) : (
@@ -183,18 +175,32 @@ export default function Home() {
                 alt=""
                 className={`${isFetching ? "animate-pulse" : ""} max-w-full rounded-lg object-cover shadow-sm shadow-black`}
               />
-              <ImageActions 
-                onGenerate={handleGenerateCollection}
-                onDelete={() => handleDeleteImage(activeIndex!)}
-                onCopy={() => handleCopyPrompt(generations[activeIndex!].prompt)}
-              />
+              <div className="absolute inset-0 bg-black bg-opacity-50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-4">
+                <button
+                  onClick={handleGenerateCollection}
+                  disabled={isGeneratingCollection}
+                  className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 transition-colors"
+                >
+                  Generate 10K
+                </button>
+              </div>
             </div>
+
+            {isGeneratingCollection && (
+              <div className="mt-4">
+                <NFTProgress
+                  total={10000}
+                  current={generatedNFTs}
+                  onComplete={handleDownloadCollection}
+                />
+              </div>
+            )}
 
             <div className="mt-4 flex gap-4 overflow-x-scroll pb-4">
               {generations.map((generatedImage, i) => (
                 <button
                   key={i}
-                  className="relative w-32 shrink-0 opacity-50 hover:opacity-100 group"
+                  className="w-32 shrink-0 opacity-50 hover:opacity-100"
                   onClick={() => setActiveIndex(i)}
                 >
                   <Image
@@ -206,11 +212,6 @@ export default function Home() {
                     alt=""
                     className="max-w-full rounded-lg object-cover shadow-sm shadow-black"
                   />
-                  <ImageActions 
-                    onGenerate={handleGenerateCollection}
-                    onDelete={() => handleDeleteImage(i)}
-                    onCopy={() => handleCopyPrompt(generatedImage.prompt)}
-                  />
                 </button>
               ))}
             </div>
@@ -218,15 +219,7 @@ export default function Home() {
         )}
       </div>
 
-      {isGeneratingCollection && (
-        <NFTProgress 
-          current={generatedNFTs}
-          total={TOTAL_NFTS}
-          onConfirm={handleConfirmCollection}
-        />
-      )}
-
-      <footer className="mt-16 w-full items-center pb-10 text-center text-gray-300 md:mt-4 md:flex md:justify-center md:pb-5 md:text-xs lg:text-sm">
+      <footer className="mt-16 w-full items-center pb-10 text-center text-gray-300 md:mt-4 md:flex md:justify-between md:pb-5 md:text-xs lg:text-sm">
         <p>
           Powered by{" "}
           <a

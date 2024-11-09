@@ -1,31 +1,44 @@
 import { Progress } from "@/components/ui/progress";
+import { Button } from "@/components/ui/button";
+import { useState, useEffect } from "react";
 
 interface NFTProgressProps {
-  current: number;
   total: number;
-  onConfirm: () => void;
+  current: number;
+  onComplete?: () => void;
 }
 
-export default function NFTProgress({ current, total, onConfirm }: NFTProgressProps) {
-  const progress = (current / total) * 100;
+export function NFTProgress({ total, current, onComplete }: NFTProgressProps) {
+  const [progress, setProgress] = useState(0);
+
+  useEffect(() => {
+    const percentage = (current / total) * 100;
+    setProgress(percentage);
+    
+    if (percentage === 100 && onComplete) {
+      onComplete();
+    }
+  }, [current, total, onComplete]);
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 bg-gray-400 p-4">
-      <div className="mx-auto max-w-4xl flex items-center gap-4">
-        <div className="flex-1">
-          <Progress value={progress} />
-          <p className="mt-2 text-sm text-gray-200">
-            Generating NFTs: {current} / {total}
+    <div className="w-full space-y-4">
+      <div className="flex items-center justify-between">
+        <div className="space-y-1">
+          <p className="text-sm font-medium">Generating NFTs</p>
+          <p className="text-sm text-gray-300">
+            {current} of {total} NFTs generated
           </p>
         </div>
-        <Button 
-          onClick={onConfirm}
-          className="bg-green-600 hover:bg-green-700"
-          disabled={current < total}
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={progress !== 100}
+          onClick={onComplete}
         >
-          Confirm
+          {progress === 100 ? "Download" : "Generating..."}
         </Button>
       </div>
+      <Progress value={progress} className="h-2" />
     </div>
   );
 }
