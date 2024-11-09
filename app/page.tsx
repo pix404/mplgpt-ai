@@ -1,324 +1,243 @@
-'use client'
+"use client";
 
-import { AuthDialog } from '@/components/auth-dialog'
-import { Chat } from '@/components/chat'
-import { ChatInput } from '@/components/chat-input'
-import { ChatPicker } from '@/components/chat-picker'
-import { ChatSettings } from '@/components/chat-settings'
-import { NavBar } from '@/components/navbar'
-import { Preview } from '@/components/preview'
-import { AuthViewType, useAuth } from '@/lib/auth'
-import { Message, toAISDKMessages, toMessageImage } from '@/lib/messages'
-import { LLMModelConfig } from '@/lib/models'
-import modelsList from '@/lib/models.json'
-import { FragmentSchema, fragmentSchema as schema } from '@/lib/schema'
-import { supabase } from '@/lib/supabase'
-import templates, { TemplateId } from '@/lib/templates'
-import { ExecutionResult } from '@/lib/types'
-import { DeepPartial } from 'ai'
-import { experimental_useObject as useObject } from 'ai/react'
-import { usePostHog } from 'posthog-js/react'
-import { SetStateAction, useEffect, useState } from 'react'
-import { useLocalStorage } from 'usehooks-ts'
+import Logo from "@/components/logo";
+import Spinner from "@/components/spinner";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
+import { Textarea } from "@/components/ui/textarea";
+import ImageActions from "@/components/ImageActions";
+import NFTProgress from "@/components/NFTProgress";
+import imagePlaceholder from "@/public/image-placeholder.png";
+import { useQuery } from "@tanstack/react-query";
+import { useDebounce } from "@uidotdev/usehooks";
+import Image from "next/image";
+import { useEffect, useState } from "react";
+
+type ImageResponse = {
+  b64_json: string;
+  timings: { inference: number };
+};
 
 export default function Home() {
-  const [chatInput, setChatInput] = useLocalStorage('chat', '')
-  const [files, setFiles] = useState<File[]>([])
-  const [selectedTemplate, setSelectedTemplate] = useState<'auto' | TemplateId>(
-    'auto',
-  )
-  const [languageModel, setLanguageModel] = useLocalStorage<LLMModelConfig>(
-    'languageModel',
-    {
-      model: 'claude-3-5-sonnet-latest',
-    },
-  )
+  const [prompt, setPrompt] = useState("");
+  const [iterativeMode, setIterativeMode] = useState(false);
+  const [userAPIKey, setUserAPIKey] = useState("");
+  const [isGeneratingCollection, setIsGeneratingCollection] = useState(false);
+  const [generatedNFTs, setGeneratedNFTs] = useState(0);
+  const TOTAL_NFTS = 10000;
+  
+  const debouncedPrompt = useDebounce(prompt, 300);
+  const [generations, setGenerations] = useState<
+    { prompt: string; image: ImageResponse }[]
+  >([]);
+  let [activeIndex, setActiveIndex] = useState<number>();
 
-  const posthog = usePostHog()
+  const { data: image, isFetching } = useQuery({
+    placeholderData: (previousData) => previousData,
+    queryKey: [debouncedPrompt],
+    queryFn: async () => {
+      let res = await fetch("/api/generateImages", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ prompt, userAPIKey, iterativeMode }),
+      });
 
-  const [result, setResult] = useState<ExecutionResult>()
-  const [messages, setMessages] = useState<Message[]>([])
-  const [fragment, setFragment] = useState<DeepPartial<FragmentSchema>>()
-  const [currentTab, setCurrentTab] = useState<'code' | 'fragment'>('code')
-  const [isPreviewLoading, setIsPreviewLoading] = useState(false)
-  const [isAuthDialogOpen, setAuthDialog] = useState(false)
-  const [authView, setAuthView] = useState<AuthViewType>('sign_in')
-  const [isRateLimited, setIsRateLimited] = useState(false)
-  const { session, apiKey } = useAuth(setAuthDialog, setAuthView)
-
-  const currentModel = modelsList.models.find(
-    (model) => model.id === languageModel.model,
-  )
-  const currentTemplate =
-    selectedTemplate === 'auto'
-      ? templates
-      : { [selectedTemplate]: templates[selectedTemplate] }
-  const lastMessage = messages[messages.length - 1]
-
-  const { object, submit, isLoading, stop, error } = useObject({
-    api:
-      currentModel?.id === 'o1-preview' || currentModel?.id === 'o1-mini'
-        ? '/api/chat-o1'
-        : '/api/chat',
-    schema,
-    onError: (error) => {
-      if (error.message.includes('request limit')) {
-        setIsRateLimited(true)
+      if (!res.ok) {
+        throw new Error(await res.text());
       }
+      return (await res.json()) as ImageResponse;
     },
-    onFinish: async ({ object: fragment, error }) => {
-      if (!error) {
-        // send it to /api/sandbox
-        console.log('fragment', fragment)
-        setIsPreviewLoading(true)
-        posthog.capture('fragment_generated', {
-          template: fragment?.template,
-        })
+    enabled: !!debouncedPrompt.trim(),
+    staleTime: Infinity,
+    retry: false,
+  });
 
-        const response = await fetch('/api/sandbox', {
-          method: 'POST',
-          body: JSON.stringify({
-            fragment,
-            userID: session?.user?.id,
-            apiKey,
-          }),
-        })
-
-        const result = await response.json()
-        console.log('result', result)
-        posthog.capture('sandbox_created', { url: result.url })
-
-        setResult(result)
-        setCurrentPreview({ fragment, result })
-        setMessage({ result })
-        setCurrentTab('fragment')
-        setIsPreviewLoading(false)
-      }
-    },
-  })
+  let isDebouncing = prompt !== debouncedPrompt;
 
   useEffect(() => {
-    if (object) {
-      setFragment(object)
-      const content: Message['content'] = [
-        { type: 'text', text: object.commentary || '' },
-        { type: 'code', text: object.code || '' },
-      ]
-
-      if (!lastMessage || lastMessage.role !== 'assistant') {
-        addMessage({
-          role: 'assistant',
-          content,
-          object,
-        })
-      }
-
-      if (lastMessage && lastMessage.role === 'assistant') {
-        setMessage({
-          content,
-          object,
-        })
-      }
+    if (image && !generations.map((g) => g.image).includes(image)) {
+      setGenerations((images) => [...images, { prompt, image }]);
+      setActiveIndex(generations.length);
     }
-  }, [object])
+  }, [generations, image, prompt]);
 
-  useEffect(() => {
-    if (error) stop()
-  }, [error])
-
-  function setMessage(message: Partial<Message>, index?: number) {
-    setMessages((previousMessages) => {
-      const updatedMessages = [...previousMessages]
-      updatedMessages[index ?? previousMessages.length - 1] = {
-        ...previousMessages[index ?? previousMessages.length - 1],
-        ...message,
-      }
-
-      return updatedMessages
-    })
-  }
-
-  async function handleSubmitAuth(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault()
-
-    if (!session) {
-      return setAuthDialog(true)
+  const handleGenerateCollection = async () => {
+    setIsGeneratingCollection(true);
+    // Simulate NFT generation - replace with actual generation logic
+    for (let i = 0; i < TOTAL_NFTS; i += 100) {
+      await new Promise(resolve => setTimeout(resolve, 100));
+      setGeneratedNFTs(Math.min(i + 100, TOTAL_NFTS));
     }
+  };
 
-    if (isLoading) {
-      stop()
+  const handleConfirmCollection = () => {
+    // Create and download zip file
+    // This is a placeholder - implement actual zip creation and download
+    alert("Collection download started!");
+    setIsGeneratingCollection(false);
+    setGeneratedNFTs(0);
+  };
+
+  const handleDeleteImage = (index: number) => {
+    setGenerations(prev => prev.filter((_, i) => i !== index));
+    if (activeIndex === index) {
+      setActiveIndex(undefined);
     }
+  };
 
-    const content: Message['content'] = [{ type: 'text', text: chatInput }]
-    const images = await toMessageImage(files)
+  const handleCopyPrompt = (prompt: string) => {
+    navigator.clipboard.writeText(prompt);
+  };
 
-    if (images.length > 0) {
-      images.forEach((image) => {
-        content.push({ type: 'image', image })
-      })
-    }
-
-    const updatedMessages = addMessage({
-      role: 'user',
-      content,
-    })
-
-    submit({
-      userID: session?.user?.id,
-      messages: toAISDKMessages(updatedMessages),
-      template: currentTemplate,
-      model: currentModel,
-      config: languageModel,
-    })
-
-    setChatInput('')
-    setFiles([])
-    setCurrentTab('code')
-
-    posthog.capture('chat_submit', {
-      template: selectedTemplate,
-      model: languageModel.model,
-    })
-  }
-
-  function retry() {
-    submit({
-      userID: session?.user?.id,
-      messages: toAISDKMessages(messages),
-      template: currentTemplate,
-      model: currentModel,
-      config: languageModel,
-    })
-  }
-
-  function addMessage(message: Message) {
-    setMessages((previousMessages) => [...previousMessages, message])
-    return [...messages, message]
-  }
-
-  function handleSaveInputChange(e: React.ChangeEvent<HTMLTextAreaElement>) {
-    setChatInput(e.target.value)
-  }
-
-  function handleFileChange(change: SetStateAction<File[]>) {
-    setFiles(change)
-  }
-
-  function logout() {
-    supabase
-      ? supabase.auth.signOut()
-      : console.warn('Supabase is not initialized')
-  }
-
-  function handleLanguageModelChange(e: LLMModelConfig) {
-    setLanguageModel({ ...languageModel, ...e })
-  }
-
-  function handleSocialClick(target: 'github' | 'x' | 'discord') {
-    if (target === 'github') {
-      window.open('https://github.com/e2b-dev/fragments', '_blank')
-    } else if (target === 'x') {
-      window.open('https://x.com/e2b_dev', '_blank')
-    } else if (target === 'discord') {
-      window.open('https://discord.gg/U7KEcGErtQ', '_blank')
-    }
-
-    posthog.capture(`${target}_click`)
-  }
-
-  function handleClearChat() {
-    stop()
-    setChatInput('')
-    setFiles([])
-    setMessages([])
-    setFragment(undefined)
-    setResult(undefined)
-    setCurrentTab('code')
-    setIsPreviewLoading(false)
-  }
-
-  function setCurrentPreview(preview: {
-    fragment: DeepPartial<FragmentSchema> | undefined
-    result: ExecutionResult | undefined
-  }) {
-    setFragment(preview.fragment)
-    setResult(preview.result)
-  }
-
-  function handleUndo() {
-    setMessages((previousMessages) => [...previousMessages.slice(0, -2)])
-    setCurrentPreview({ fragment: undefined, result: undefined })
-  }
+  let activeImage =
+    activeIndex !== undefined ? generations[activeIndex].image : undefined;
 
   return (
-    <main className="flex min-h-screen max-h-screen">
-      {supabase && (
-        <AuthDialog
-          open={isAuthDialogOpen}
-          setOpen={setAuthDialog}
-          view={authView}
-          supabase={supabase}
+    <div className="flex h-full flex-col px-5">
+      <header className="flex justify-center pt-20 md:justify-end md:pt-3">
+        <div className="absolute left-1/2 top-6 -translate-x-1/2">
+          <a href="https://www.mplgpt.ai" target="_blank">
+            <Logo />
+          </a>
+        </div>
+        <div>
+          <label className="text-xs text-gray-200">
+            [Optional] Add your{" "}
+            <a
+              href="https://api.together.xyz/settings/api-keys"
+              target="_blank"
+              className="underline underline-offset-4 transition hover:text-blue-500"
+            >
+              Together API Key
+            </a>{" "}
+          </label>
+          <Input
+            placeholder="API Key"
+            type="password"
+            value={userAPIKey}
+            className="mt-1 bg-gray-400 text-gray-200 placeholder:text-gray-300"
+            onChange={(e) => setUserAPIKey(e.target.value)}
+          />
+        </div>
+      </header>
+
+      <div className="flex justify-center">
+        <form className="mt-10 w-full max-w-lg">
+          <fieldset>
+            <div className="relative">
+              <Textarea
+                rows={4}
+                spellCheck={false}
+                placeholder="Describe your NFT collection..."
+                required
+                value={prompt}
+                onChange={(e) => setPrompt(e.target.value)}
+                className="w-full resize-none border-gray-300 border-opacity-50 bg-gray-400 px-4 text-base placeholder-gray-300"
+              />
+              <div
+                className={`${isFetching || isDebouncing ? "flex" : "hidden"} absolute bottom-3 right-3 items-center justify-center`}
+              >
+                <Spinner className="size-4" />
+              </div>
+            </div>
+
+            <div className="mt-3 text-sm md:text-right">
+              <label
+                title="Use earlier images as references"
+                className="inline-flex items-center gap-2"
+              >
+                Consistency mode
+                <Switch
+                  checked={iterativeMode}
+                  onCheckedChange={setIterativeMode}
+                />
+              </label>
+            </div>
+          </fieldset>
+        </form>
+      </div>
+
+      <div className="flex w-full grow flex-col items-center justify-center pb-8 pt-4 text-center">
+        {!activeImage || !prompt ? (
+          <div className="max-w-xl md:max-w-4xl lg:max-w-3xl">
+            <p className="text-xl font-semibold text-gray-200 md:text-3xl lg:text-4xl">
+              Generate Metaplex NFT collections in real-time
+            </p>
+            <p className="mt-4 text-balance text-sm text-gray-300 md:text-base lg:text-lg">
+              Describe your NFT collection and generate variations in milliseconds as you type.
+              Once satisfied, generate your entire 10k collection with one click.
+            </p>
+          </div>
+        ) : (
+          <div className="mt-4 flex w-full max-w-4xl flex-col justify-center">
+            <div className="relative group">
+              <Image
+                placeholder="blur"
+                blurDataURL={imagePlaceholder.blurDataURL}
+                width={1024}
+                height={768}
+                src={`data:image/png;base64,${activeImage.b64_json}`}
+                alt=""
+                className={`${isFetching ? "animate-pulse" : ""} max-w-full rounded-lg object-cover shadow-sm shadow-black`}
+              />
+              <ImageActions 
+                onGenerate={handleGenerateCollection}
+                onDelete={() => handleDeleteImage(activeIndex!)}
+                onCopy={() => handleCopyPrompt(generations[activeIndex!].prompt)}
+              />
+            </div>
+
+            <div className="mt-4 flex gap-4 overflow-x-scroll pb-4">
+              {generations.map((generatedImage, i) => (
+                <button
+                  key={i}
+                  className="relative w-32 shrink-0 opacity-50 hover:opacity-100 group"
+                  onClick={() => setActiveIndex(i)}
+                >
+                  <Image
+                    placeholder="blur"
+                    blurDataURL={imagePlaceholder.blurDataURL}
+                    width={1024}
+                    height={768}
+                    src={`data:image/png;base64,${generatedImage.image.b64_json}`}
+                    alt=""
+                    className="max-w-full rounded-lg object-cover shadow-sm shadow-black"
+                  />
+                  <ImageActions 
+                    onGenerate={handleGenerateCollection}
+                    onDelete={() => handleDeleteImage(i)}
+                    onCopy={() => handleCopyPrompt(generatedImage.prompt)}
+                  />
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {isGeneratingCollection && (
+        <NFTProgress 
+          current={generatedNFTs}
+          total={TOTAL_NFTS}
+          onConfirm={handleConfirmCollection}
         />
       )}
-      <div className="grid w-full md:grid-cols-2">
-        <div
-          className={`flex flex-col w-full max-h-full max-w-[800px] mx-auto px-4 overflow-auto ${fragment ? 'col-span-1' : 'col-span-2'}`}
-        >
-          <NavBar
-            session={session}
-            showLogin={() => setAuthDialog(true)}
-            signOut={logout}
-            onSocialClick={handleSocialClick}
-            onClear={handleClearChat}
-            canClear={messages.length > 0}
-            canUndo={messages.length > 1 && !isLoading}
-            onUndo={handleUndo}
-          />
-          <Chat
-            messages={messages}
-            isLoading={isLoading}
-            setCurrentPreview={setCurrentPreview}
-          />
-          <ChatInput
-            retry={retry}
-            isErrored={error !== undefined}
-            isLoading={isLoading}
-            isRateLimited={isRateLimited}
-            stop={stop}
-            input={chatInput}
-            handleInputChange={handleSaveInputChange}
-            handleSubmit={handleSubmitAuth}
-            isMultiModal={currentModel?.multiModal || false}
-            files={files}
-            handleFileChange={handleFileChange}
+
+      <footer className="mt-16 w-full items-center pb-10 text-center text-gray-300 md:mt-4 md:flex md:justify-center md:pb-5 md:text-xs lg:text-sm">
+        <p>
+          Powered by{" "}
+          <a
+            href="https://pix404.com"
+            target="_blank"
+            className="underline underline-offset-4 transition hover:text-blue-500"
           >
-            <ChatPicker
-              templates={templates}
-              selectedTemplate={selectedTemplate}
-              onSelectedTemplateChange={setSelectedTemplate}
-              models={modelsList.models}
-              languageModel={languageModel}
-              onLanguageModelChange={handleLanguageModelChange}
-            />
-            <ChatSettings
-              languageModel={languageModel}
-              onLanguageModelChange={handleLanguageModelChange}
-              apiKeyConfigurable={!process.env.NEXT_PUBLIC_NO_API_KEY_INPUT}
-              baseURLConfigurable={!process.env.NEXT_PUBLIC_NO_BASE_URL_INPUT}
-            />
-          </ChatInput>
-        </div>
-        <Preview
-          apiKey={apiKey}
-          selectedTab={currentTab}
-          onSelectedTabChange={setCurrentTab}
-          isChatLoading={isLoading}
-          isPreviewLoading={isPreviewLoading}
-          fragment={fragment}
-          result={result as ExecutionResult}
-          onClose={() => setFragment(undefined)}
-        />
-      </div>
-    </main>
-  )
+            pix404.com
+          </a>
+        </p>
+      </footer>
+    </div>
+  );
 }

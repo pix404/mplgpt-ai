@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-50 -50 100 100">
+  <defs>
+    <!-- Primary Gradient -->
+    <linearGradient id="primaryGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#FF3366;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#7C3AED;stop-opacity:1" />
+    </linearGradient>
+    
+    <!-- Neural Network Pattern -->
+    <pattern id="neuralPattern" x="0" y="0" width="40" height="40" patternUnits="userSpaceOnUse">
+      <circle cx="20" cy="20" r="1" fill="#ffffff22"/>
+      <path d="M20,20 L40,40 M20,20 L0,40 M20,20 L40,0" stroke="#ffffff11" stroke-width="0.5"/>
+    </pattern>
+  </defs>
+
+  <!-- Base hexagon -->
+  <path d="M0,-30 L26,-15 L26,15 L0,30 L-26,15 L-26,-15 Z" 
+        fill="url(#primaryGrad)"/>
+  
+  <!-- Dynamic elements -->
+  <g transform="rotate(30)">
+    <path d="M-20,-20 Q0,-40 20,-20 Q40,0 20,20 Q0,40 -20,20 Q-40,0 -20,-20 Z" 
+          fill="none" 
+          stroke="white" 
+          stroke-width="2" 
+          stroke-dasharray="2 4"/>
+  </g>
+  
+  <!-- Central neural network -->
+  <circle cx="0" cy="0" r="12" fill="#ffffff33"/>
+  <circle cx="0" cy="0" r="8" fill="#ffffff"/>
+  
+  <!-- Connection points -->
+  <g id="nodes">
+    <circle cx="18" cy="-10" r="3" fill="white"/>
+    <circle cx="18" cy="10" r="3" fill="white"/>
+    <circle cx="-18" cy="-10" r="3" fill="white"/>
+    <circle cx="-18" cy="10" r="3" fill="white"/>
+  </g>
+</svg>

@@ -1,28 +1,26 @@
-'use client'
+"use client";
 
-import { ThemeProvider as NextThemesProvider } from 'next-themes'
-import { type ThemeProviderProps } from 'next-themes/dist/types'
-import posthog from 'posthog-js'
-import { PostHogProvider as PostHogProviderJS } from 'posthog-js/react'
+import {
+  QueryCache,
+  QueryClient,
+  QueryClientProvider,
+} from "@tanstack/react-query";
+import { ReactNode } from "react";
+import toast, { Toaster } from "react-hot-toast";
 
-if (typeof window !== 'undefined' && process.env.NEXT_PUBLIC_ENABLE_POSTHOG) {
-  posthog.init(process.env.NEXT_PUBLIC_POSTHOG_KEY ?? '', {
-    api_host: process.env.NEXT_PUBLIC_POSTHOG_HOST,
-    person_profiles: 'identified_only',
-    session_recording: {
-      recordCrossOriginIframes: true,
-    }
-  })
-}
+const queryClient = new QueryClient({
+  queryCache: new QueryCache({
+    onError: (error) => {
+      toast.error(error.message.slice(1, -1));
+    },
+  }),
+});
 
-export function PostHogProvider({ children }: { children: React.ReactNode }) {
-  return process.env.NEXT_PUBLIC_ENABLE_POSTHOG ? (
-    <PostHogProviderJS client={posthog}>{children}</PostHogProviderJS>
-  ) : (
-    children
-  )
-}
-
-export function ThemeProvider({ children, ...props }: ThemeProviderProps) {
-  return <NextThemesProvider {...props}>{children}</NextThemesProvider>
+export default function Providers({ children }: { children: ReactNode }) {
+  return (
+    <QueryClientProvider client={queryClient}>
+      {children}
+      <Toaster />
+    </QueryClientProvider>
+  );
 }

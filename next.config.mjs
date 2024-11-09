@@ -1,9 +1,13 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  experimental: {
-    // Disable turbo
-    turbo: false
-  }
-}
+  images: {
+    remotePatterns: [
+      {
+        protocol: "https",
+        hostname: "api.together.ai",
+      },
+    ],
+  },
+};
 
-export default nextConfig
+export default nextConfig;
