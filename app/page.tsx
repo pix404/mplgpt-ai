@@ -3,7 +3,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useDebounce } from "@uidotdev/usehooks";
 import Image from "next/image";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
@@ -11,6 +11,8 @@ import { ImageGrid } from "@/components/ImageGrid";
 import JSZip from "jszip";
 import { Button } from "@/components/ui/button";
 import { Pagination } from "@/components/Pagination";
+import { NFTProgress } from "@/components/NFTProgress";
+import { saveAs } from "file-saver";
 
 type ImageResponse = {
   index: number;
@@ -26,6 +28,23 @@ export default function Home() {
   >([]);
   const [currentPage, setCurrentPage] = useState(1);
   const imagesPerPage = 4;
+  const [batchProgress, setBatchProgress] = useState<{
+    current: number;
+    total: number;
+  } | null>(null);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const abortControllerRef = useRef<AbortController | null>(null);
+
+  const progressRef = useRef({ current: 0, total: 0 });
+
+  useEffect(() => {
+    if (progressRef.current.current > 0) {
+      setBatchProgress({
+        current: progressRef.current.current,
+        total: progressRef.current.total,
+      });
+    }
+  }, [progressRef.current.current]);
 
   // Calculate total pages
   const totalPages = Math.ceil(generations.length / imagesPerPage);
@@ -82,6 +101,85 @@ export default function Home() {
     }
   };
 
+  const fetchWithRetry = async (url: string, options = {}, retries = 3) => {
+    try {
+      return await fetch(url, options);
+    } catch (error) {
+      if (retries > 0) {
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+        return fetchWithRetry(url, options, retries - 1);
+      }
+      throw error;
+    }
+  };
+
+  const handleBatchGenerate = async () => {
+    const total = 2;
+    setIsGenerating(true);
+    setBatchProgress({ current: 0, total });
+    const zip = new JSZip();
+    abortControllerRef.current = new AbortController();
+
+    try {
+      for (let i = 0; i < total; i++) {
+        if (abortControllerRef.current?.signal.aborted) {
+          throw new Error("Generation cancelled");
+        }
+
+        try {
+          const result = await fetchWithRetry("/api/generateImages", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              prompt,
+              userAPIKey,
+              iterativeMode: false,
+            }),
+          });
+
+          if (!result.ok) {
+            throw new Error(await result.text());
+          }
+
+          const newImage = await result.json();
+          if (!newImage?.url) {
+            throw new Error("Failed to generate image");
+          }
+
+          const response = await fetchWithRetry(newImage.url);
+          const blob = await response.blob();
+          zip.file(`image-${i + 1}.jpg`, blob);
+
+          setBatchProgress((prev) => ({
+            current: i + 1,
+            total,
+          }));
+
+          await new Promise((resolve) => setTimeout(resolve, 0));
+        } catch (error) {
+          console.error(`Error generating image ${i + 1}:`, error);
+          continue;
+        }
+      }
+
+      const content = await zip.generateAsync({ type: "blob" });
+      saveAs(content, `${prompt.slice(0, 30)}-pack.zip`);
+    } catch (error) {
+      console.error("Batch generation error:", error);
+      if (error instanceof Error && error.message !== "Generation cancelled") {
+        alert(error.message || "Error generating images. Please try again.");
+      }
+    } finally {
+      setIsGenerating(false);
+      setBatchProgress(null);
+      abortControllerRef.current = null;
+    }
+  };
+
+  const handleStopGeneration = () => {
+    abortControllerRef.current?.abort();
+  };
+
   return (
     <div className="mx-auto flex h-full max-w-7xl flex-col px-5">
       <header className="flex justify-center pt-20 md:justify-end md:pt-3">
@@ -127,13 +225,14 @@ export default function Home() {
             <Button type="submit" className="bg-blue-600 hover:bg-blue-700">
               Generate Image
             </Button>
-            {generations.length > 0 && (
+            {prompt.trim() && (
               <Button
                 type="button"
-                onClick={() => handleGenerateMore(prompt)}
-                className="bg-green-600 hover:bg-green-700"
+                onClick={handleBatchGenerate}
+                className="bg-purple-600 hover:bg-purple-700"
+                disabled={!!batchProgress}
               >
-                Generate More
+                Generate 10k Pack
               </Button>
             )}
           </div>
@@ -141,7 +240,20 @@ export default function Home() {
       </div>
 
       <div className="flex w-full grow flex-col items-center justify-center space-y-4 px-4 pb-8 pt-4">
-        {generations.length > 0 ? (
+        {batchProgress ? (
+          <div className="w-full max-w-lg">
+            <NFTProgress
+              current={batchProgress.current}
+              total={batchProgress.total}
+            />
+            <Button
+              onClick={handleStopGeneration}
+              className="mt-4 bg-red-600 hover:bg-red-700"
+            >
+              Stop Generation
+            </Button>
+          </div>
+        ) : (
           <>
             <ImageGrid
               images={generations.slice(
@@ -182,15 +294,6 @@ export default function Home() {
               </button>
             </div>
           </>
-        ) : (
-          <div className="max-w-xl md:max-w-4xl lg:max-w-3xl">
-            <p className="text-xl font-semibold text-gray-200 md:text-3xl lg:text-4xl">
-              Generate images one by one
-            </p>
-            <p className="mt-4 text-balance text-sm text-gray-300 md:text-base lg:text-lg">
-              Enter a prompt and generate images in milliseconds as you type.
-            </p>
-          </div>
         )}
       </div>
     </div>
