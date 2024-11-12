@@ -1,32 +1,32 @@
 // For Pages Router (pages/api/proxyImage.ts)
 import type { NextApiRequest, NextApiResponse } from "next";
 
-export default async function handler(
-  req: NextApiRequest,
-  res: NextApiResponse,
-) {
-  const { url } = req.query;
+// export default async function handler(
+//   req: NextApiRequest,
+//   res: NextApiResponse,
+// ) {
+//   const { url } = req.query;
 
-  if (!url || typeof url !== "string") {
-    return res.status(400).json({ error: "URL is required" });
-  }
+//   if (!url || typeof url !== "string") {
+//     return res.status(400).json({ error: "URL is required" });
+//   }
 
-  try {
-    const response = await fetch(url);
-    const blob = await response.blob();
-    const arrayBuffer = await blob.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
+//   try {
+//     const response = await fetch(url);
+//     const blob = await response.blob();
+//     const arrayBuffer = await blob.arrayBuffer();
+//     const buffer = Buffer.from(arrayBuffer);
 
-    // Set appropriate headers
-    res.setHeader(
-      "Content-Type",
-      response.headers.get("content-type") || "image/jpeg",
-    );
-    res.send(buffer);
-  } catch (error) {
-    res.status(500).json({ error: "Failed to fetch image" });
-  }
-}
+//     // Set appropriate headers
+//     res.setHeader(
+//       "Content-Type",
+//       response.headers.get("content-type") || "image/jpeg",
+//     );
+//     res.send(buffer);
+//   } catch (error) {
+//     res.status(500).json({ error: "Failed to fetch image" });
+//   }
+// }
 
 // OR for App Router (app/api/proxyImage/route.ts)
 export async function GET(request: Request) {
