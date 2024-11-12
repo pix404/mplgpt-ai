@@ -1,45 +1,59 @@
 import Image from "next/image";
 import { Button } from "./ui/button";
+import { Dialog, DialogContent } from "./ui/dialog";
+import { useState } from "react";
+
+interface ImageResponse {
+  url: string;
+  index: number;
+}
 
 interface ImageGridProps {
-  images: { prompt: string; image: { url: string; index: number } }[];
-  totalImages: number;
-  onDownloadRest: () => void;
+  images: { prompt: string; image: ImageResponse }[];
+  onGenerateMore: (promptText: string) => Promise<void>;
+  onImageClick: () => void;
 }
 
 export function ImageGrid({
   images,
-  totalImages,
-  onDownloadRest,
+  onGenerateMore,
+  onImageClick,
 }: ImageGridProps) {
-  const imagesPerPage = 100;
-  const displayedImages = images.slice(0, imagesPerPage);
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
 
   return (
-    <div className="w-full space-y-4">
-      <div className="grid grid-cols-5 gap-4">
-        {displayedImages.map((img) => (
-          <div key={img.image.index} className="relative aspect-square">
+    <>
+      <div className="grid grid-cols-2 gap-4">
+        {images.map((item, index) => (
+          <div key={index} className="group relative">
             <Image
-              src={img.image.url}
-              alt={`Generated image ${img.image.index}`}
-              fill
-              className="rounded-lg object-cover"
+              src={item.image.url}
+              alt={item.prompt}
+              width={1024}
+              height={1024}
+              className="cursor-pointer rounded-lg transition hover:opacity-80"
+              onClick={() => setSelectedImage(item.image.url)}
             />
           </div>
         ))}
       </div>
 
-      {totalImages > imagesPerPage && (
-        <div className="flex justify-end">
-          <Button
-            onClick={onDownloadRest}
-            className="bg-green-600 hover:bg-green-700"
-          >
-            Download Remaining {totalImages - imagesPerPage} Images
-          </Button>
-        </div>
-      )}
-    </div>
+      <Dialog
+        open={!!selectedImage}
+        onOpenChange={() => setSelectedImage(null)}
+      >
+        <DialogContent className="max-w-4xl">
+          {selectedImage && (
+            <Image
+              src={selectedImage}
+              alt="Selected image"
+              width={1024}
+              height={1024}
+              className="rounded-lg"
+            />
+          )}
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }

@@ -9,6 +9,8 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { ImageGrid } from "@/components/ImageGrid";
 import JSZip from "jszip";
+import { Button } from "@/components/ui/button";
+import { Pagination } from "@/components/Pagination";
 
 type ImageResponse = {
   index: number;
@@ -22,18 +24,26 @@ export default function Home() {
   const [generations, setGenerations] = useState<
     { prompt: string; image: ImageResponse }[]
   >([]);
-  const [isGeneratingCollection, setIsGeneratingCollection] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
-  const imagesPerPage = 10;
-  const [abortController, setAbortController] =
-    useState<AbortController | null>(null);
+  const imagesPerPage = 4;
 
-  const fetchImage = async (controller: AbortController) => {
+  // Calculate total pages
+  const totalPages = Math.ceil(generations.length / imagesPerPage);
+
+  // Get current page's images
+  const indexOfLastImage = currentPage * imagesPerPage;
+  const indexOfFirstImage = indexOfLastImage - imagesPerPage;
+  const currentImages = generations.slice(indexOfFirstImage, indexOfLastImage);
+
+  const fetchImage = async (promptText: string) => {
     const res = await fetch("/api/generateImages", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ prompt, userAPIKey, iterativeMode: false }),
-      signal: controller.signal,
+      body: JSON.stringify({
+        prompt: promptText,
+        userAPIKey,
+        iterativeMode: false,
+      }),
     });
 
     if (!res.ok) {
@@ -41,48 +51,36 @@ export default function Home() {
     }
 
     const newImage = await res.json();
-    return { prompt, image: newImage };
+    return { prompt: promptText, image: newImage };
   };
 
-  const handleGenerateCollection = async () => {
+  const handleGenerateMore = async (promptText: string) => {
+    try {
+      const newImage = await fetchImage(promptText);
+      setGenerations((prev) => [...prev, newImage]);
+      // Reset to first page when generating new images
+      setCurrentPage(1);
+    } catch (error) {
+      console.error("Error generating image:", error);
+      alert("Error generating image. Please try again.");
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
     if (!prompt.trim()) {
       alert("Please enter a prompt first");
       return;
     }
 
-    const controller = new AbortController();
-    setAbortController(controller);
-    setIsGeneratingCollection(true);
-
     try {
-      for (let i = 0; i < 100; i++) {
-        const newImage = await fetchImage(controller);
-        setGenerations((prev) => [...prev, newImage]);
-      }
+      const newImage = await fetchImage(prompt);
+      setGenerations((prev) => [...prev, newImage]);
     } catch (error) {
-      if (error instanceof Error && error.name === "AbortError") {
-        console.log("Generation cancelled");
-      } else {
-        console.error("Error generating collection:", error);
-        alert("Error generating collection. Please try again.");
-      }
-    } finally {
-      setIsGeneratingCollection(false);
-      setAbortController(null);
+      console.error("Error generating image:", error);
+      alert("Error generating image. Please try again.");
     }
   };
-
-  const handleStopGeneration = () => {
-    if (abortController) {
-      abortController.abort();
-    }
-  };
-
-  const totalPages = Math.ceil(generations.length / imagesPerPage);
-  const currentImages = generations.slice(
-    (currentPage - 1) * imagesPerPage,
-    currentPage * imagesPerPage,
-  );
 
   return (
     <div className="mx-auto flex h-full max-w-7xl flex-col px-5">
@@ -111,7 +109,7 @@ export default function Home() {
       </header>
 
       <div className="flex justify-center px-4 sm:px-6 lg:px-8">
-        <form className="mt-10 w-full max-w-lg">
+        <form className="mt-10 w-full max-w-lg" onSubmit={handleSubmit}>
           <fieldset>
             <div className="relative">
               <Textarea
@@ -125,62 +123,69 @@ export default function Home() {
               />
             </div>
           </fieldset>
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={handleGenerateCollection}
-              disabled={isGeneratingCollection}
-              className="mt-4 rounded bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 disabled:opacity-50"
-            >
-              Generate 100 Images
-            </button>
-            {isGeneratingCollection && (
-              <button
+          <div className="mt-4 flex gap-2">
+            <Button type="submit" className="bg-blue-600 hover:bg-blue-700">
+              Generate Image
+            </Button>
+            {generations.length > 0 && (
+              <Button
                 type="button"
-                onClick={handleStopGeneration}
-                className="mt-4 rounded bg-red-600 px-4 py-2 text-white hover:bg-red-700"
+                onClick={() => handleGenerateMore(prompt)}
+                className="bg-green-600 hover:bg-green-700"
               >
-                Stop Generation
-              </button>
+                Generate More
+              </Button>
             )}
           </div>
         </form>
       </div>
 
-      <div className="flex w-full grow flex-col items-center justify-center space-y-4 px-4 pb-8 pt-4 text-center sm:px-6 lg:px-8">
+      <div className="flex w-full grow flex-col items-center justify-center space-y-4 px-4 pb-8 pt-4">
         {generations.length > 0 ? (
           <>
             <ImageGrid
-              images={currentImages}
-              totalImages={generations.length}
-              onDownloadRest={() => {}}
+              images={generations.slice(
+                (currentPage - 1) * imagesPerPage,
+                currentPage * imagesPerPage,
+              )}
+              onGenerateMore={handleGenerateMore}
+              onImageClick={() => {}}
             />
-            <div className="flex items-center gap-4 text-gray-200">
+            <div className="mb-4 flex items-center gap-4">
               <button
-                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
                 disabled={currentPage === 1}
-                className="disabled:opacity-50"
+                className="hover:bg-gray-700 rounded bg-gray-600 px-4 py-2 text-white disabled:opacity-50"
               >
-                &lt;
+                Previous
               </button>
-              <span>
-                {currentPage} of {totalPages}
+
+              <span className="text-sm text-gray-300">
+                {currentPage} of {Math.ceil(generations.length / imagesPerPage)}
               </span>
+
               <button
                 onClick={() =>
-                  setCurrentPage((p) => Math.min(totalPages, p + 1))
+                  setCurrentPage(
+                    Math.min(
+                      Math.ceil(generations.length / imagesPerPage),
+                      currentPage + 1,
+                    ),
+                  )
                 }
-                disabled={currentPage === totalPages}
-                className="disabled:opacity-50"
+                disabled={
+                  currentPage === Math.ceil(generations.length / imagesPerPage)
+                }
+                className="hover:bg-gray-700 rounded bg-gray-600 px-4 py-2 text-white disabled:opacity-50"
               >
-                &gt;
+                Next
               </button>
             </div>
           </>
         ) : (
           <div className="max-w-xl md:max-w-4xl lg:max-w-3xl">
             <p className="text-xl font-semibold text-gray-200 md:text-3xl lg:text-4xl">
-              Generate NFT collections in real-time
+              Generate images one by one
             </p>
             <p className="mt-4 text-balance text-sm text-gray-300 md:text-base lg:text-lg">
               Enter a prompt and generate images in milliseconds as you type.
