@@ -102,7 +102,7 @@ export default function Home() {
   };
 
   const handleBatchGenerate = async () => {
-    const total = 10;
+    const total = 1000;
     setIsGenerating(true);
     setBatchProgress({ current: 0, total });
     const zip = new JSZip();
