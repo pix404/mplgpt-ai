@@ -85,7 +85,7 @@ export default function Home() {
   );
 
   return (
-    <div className="flex h-full flex-col px-5">
+    <div className="mx-auto flex h-full max-w-7xl flex-col px-5">
       <header className="flex justify-center pt-20 md:justify-end md:pt-3">
         <div className="space-y-2">
           <div>
@@ -110,7 +110,7 @@ export default function Home() {
         </div>
       </header>
 
-      <div className="flex justify-center">
+      <div className="flex justify-center px-4 sm:px-6 lg:px-8">
         <form className="mt-10 w-full max-w-lg">
           <fieldset>
             <div className="relative">
@@ -147,7 +147,7 @@ export default function Home() {
         </form>
       </div>
 
-      <div className="flex w-full grow flex-col items-center justify-center space-y-4 pb-8 pt-4 text-center">
+      <div className="flex w-full grow flex-col items-center justify-center space-y-4 px-4 pb-8 pt-4 text-center sm:px-6 lg:px-8">
         {generations.length > 0 ? (
           <>
             <ImageGrid
