@@ -101,20 +101,8 @@ export default function Home() {
     }
   };
 
-  const fetchWithRetry = async (url: string, options = {}, retries = 3) => {
-    try {
-      return await fetch(url, options);
-    } catch (error) {
-      if (retries > 0) {
-        await new Promise((resolve) => setTimeout(resolve, 1000));
-        return fetchWithRetry(url, options, retries - 1);
-      }
-      throw error;
-    }
-  };
-
   const handleBatchGenerate = async () => {
-    const total = 2;
+    const total = 10;
     setIsGenerating(true);
     setBatchProgress({ current: 0, total });
     const zip = new JSZip();
@@ -127,34 +115,26 @@ export default function Home() {
         }
 
         try {
-          const result = await fetchWithRetry("/api/generateImages", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              prompt,
-              userAPIKey,
-              iterativeMode: false,
-            }),
-          });
-
-          if (!result.ok) {
-            throw new Error(await result.text());
-          }
-
-          const newImage = await result.json();
-          if (!newImage?.url) {
+          const result = await fetchImage(prompt);
+          if (!result?.image?.url) {
             throw new Error("Failed to generate image");
           }
 
-          const response = await fetchWithRetry(newImage.url);
-          const blob = await response.blob();
-          zip.file(`image-${i + 1}.jpg`, blob);
+          // Fetch the image as a blob
+          const response = await fetch(
+            `/api/proxyImage?url=${encodeURIComponent(result.image.url)}`,
+          );
+          const imageBlob = await response.blob();
+
+          // Add to zip with a numbered filename
+          zip.file(`image-${i + 1}.jpg`, imageBlob);
 
           setBatchProgress((prev) => ({
             current: i + 1,
             total,
           }));
 
+          // Give React time to update the UI
           await new Promise((resolve) => setTimeout(resolve, 0));
         } catch (error) {
           console.error(`Error generating image ${i + 1}:`, error);
