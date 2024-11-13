@@ -1,16 +1,15 @@
-module.exports = {
+/** @type {import('next').NextConfig} */
+const nextConfig = {
   images: {
     remotePatterns: [
       {
         protocol: 'https',
-        hostname: 'api.together.ai',
-        pathname: '/imgproxy/**',
+        hostname: '**',
+        port: '',
+        pathname: '**',
       },
-      {
-        protocol: 'https',
-        hostname: 'together-ai-bfl-images-prod.s3.us-west-2.amazonaws.com',
-        pathname: '/images/**',
-      }
     ],
-  }
-} 
+  },
+}
+
+module.exports = nextConfig 

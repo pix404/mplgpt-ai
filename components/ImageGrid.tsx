@@ -1,3 +1,5 @@
+"use client";
+
 import Image from "next/image";
 import { Button } from "./ui/button";
 import { Dialog, DialogContent } from "./ui/dialog";
@@ -17,6 +19,7 @@ interface ImageResponse {
 interface ImageGridProps {
   images: { prompt: string; image: ImageResponse }[];
   onGenerateMore: (promptText: string, amount: number) => Promise<void>;
+
   onImageClick: (url: string) => void;
   selectedImage?: string;
 }

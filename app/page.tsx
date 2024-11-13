@@ -14,6 +14,7 @@ import { Pagination } from "@/components/Pagination";
 import { NFTProgress } from "@/components/NFTProgress";
 import { saveAs } from "file-saver";
 import Spinner from "@/components/spinner";
+import { NFTMetadata } from "@/types/nft";
 
 type ImageResponse = {
   index: number;
@@ -152,7 +153,7 @@ export default function Home() {
 
   const handleBatchGenerate = async () => {
     const total = 1000;
-    const batchSize = 3; // Number of parallel requests
+    const batchSize = 3;
     setIsGenerating(true);
     setBatchProgress({ current: 0, total });
     const zip = new JSZip();
@@ -179,17 +180,40 @@ export default function Home() {
               if (!result?.image?.url) {
                 throw new Error("Failed to generate image");
               }
-              return { index, result };
+
+              // Fetch the actual image data
+              const response = await fetch(result.image.url);
+              if (!response.ok) {
+                throw new Error("Failed to fetch image data");
+              }
+              const imageBlob = await response.blob();
+
+              return { index, imageBlob, result };
             }),
           );
 
           // Process results
-          for (const { index, result } of results) {
-            const response = await fetch(
-              `/api/proxyImage?url=${encodeURIComponent(result.image.url)}`,
-            );
-            const imageBlob = await response.blob();
-            zip.file(`image-${index + 1}.jpg`, imageBlob);
+          for (const { index, imageBlob, result } of results) {
+            // Add image to zip
+            zip.file(`${index + 1}.jpg`, imageBlob);
+
+            // Create and add metadata
+            const metadata: NFTMetadata = {
+              name: `${prompt.slice(0, 30)} #${index + 1}`,
+              description: prompt,
+              image: `${index + 1}.jpg`,
+              attributes: [
+                {
+                  prompt: prompt,
+                  model: "black-forest-labs/FLUX.1-schnell",
+                  timestamp: new Date().toISOString(),
+                  index: index + 1,
+                },
+              ],
+            };
+
+            // Add metadata JSON file
+            zip.file(`${index + 1}.json`, JSON.stringify(metadata, null, 2));
           }
 
           setBatchProgress((prev) => ({
@@ -232,11 +256,36 @@ export default function Home() {
       // Process all current generations
       for (let i = 0; i < generations.length; i++) {
         const generation = generations[i];
+
+        // Use proxy endpoint to fetch the image data
         const response = await fetch(
           `/api/proxyImage?url=${encodeURIComponent(generation.image.url)}`,
         );
+        if (!response.ok) {
+          throw new Error("Failed to fetch image data");
+        }
         const imageBlob = await response.blob();
-        zip.file(`image-${i + 1}.jpg`, imageBlob);
+
+        // Add image to zip
+        zip.file(`${i + 1}.jpg`, imageBlob);
+
+        // Create and add metadata
+        const metadata: NFTMetadata = {
+          name: `${prompt.slice(0, 30)} #${i + 1}`,
+          description: prompt,
+          image: `${i + 1}.jpg`,
+          attributes: [
+            {
+              prompt: prompt,
+              model: "black-forest-labs/FLUX.1-schnell",
+              timestamp: new Date().toISOString(),
+              index: i + 1,
+            },
+          ],
+        };
+
+        // Add metadata JSON file
+        zip.file(`${i + 1}.json`, JSON.stringify(metadata, null, 2));
 
         setBatchProgress((prev) => ({
           current: i + 1,
