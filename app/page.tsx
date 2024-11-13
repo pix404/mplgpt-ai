@@ -1,6 +1,6 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, QueryClient } from "@tanstack/react-query";
 import { useDebounce } from "@uidotdev/usehooks";
 import Image from "next/image";
 import { useEffect, useState, useRef } from "react";
@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Pagination } from "@/components/Pagination";
 import { NFTProgress } from "@/components/NFTProgress";
 import { saveAs } from "file-saver";
+import Spinner from "@/components/spinner";
 
 type ImageResponse = {
   index: number;
@@ -54,7 +55,17 @@ export default function Home() {
   const indexOfFirstImage = indexOfLastImage - imagesPerPage;
   const currentImages = generations.slice(indexOfFirstImage, indexOfLastImage);
 
+  const queryClient = new QueryClient();
+
   const fetchImage = async (promptText: string) => {
+    const queryKey = ["image", promptText];
+
+    // Check cache first
+    const cachedData = queryClient.getQueryData(queryKey);
+    if (cachedData) {
+      return cachedData;
+    }
+
     const res = await fetch("/api/generateImages", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -70,18 +81,53 @@ export default function Home() {
     }
 
     const newImage = await res.json();
-    return { prompt: promptText, image: newImage };
+    const result = { prompt: promptText, image: newImage };
+
+    // Cache the result
+    queryClient.setQueryData(queryKey, result);
+
+    return result;
   };
 
-  const handleGenerateMore = async (promptText: string) => {
+  const handleGenerateMore = async (promptText: string, amount: number) => {
+    setIsGenerating(true);
+    setBatchProgress({ current: 0, total: amount });
+
     try {
-      const newImage = await fetchImage(promptText);
-      setGenerations((prev) => [...prev, newImage]);
-      // Reset to first page when generating new images
+      const batchSize = 3; // Number of parallel requests
+
+      for (let i = 0; i < amount; i += batchSize) {
+        const batch = Array.from(
+          { length: Math.min(batchSize, amount - i) },
+          (_, j) => i + j,
+        );
+
+        // Generate images in parallel
+        const results = await Promise.all(
+          batch.map(async () => {
+            const result = await fetchImage(promptText);
+            return result as { prompt: string; image: ImageResponse };
+          }),
+        );
+
+        setGenerations((prev) => [...prev, ...results]);
+        setBatchProgress((prev) => ({
+          current: Math.min((prev?.current || 0) + batchSize, amount),
+          total: amount,
+        }));
+
+        // Small delay between batches
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      }
+
+      // Reset to first page when done
       setCurrentPage(1);
     } catch (error) {
-      console.error("Error generating image:", error);
-      alert("Error generating image. Please try again.");
+      console.error("Error generating images:", error);
+      alert("Error generating images. Please try again.");
+    } finally {
+      setIsGenerating(false);
+      setBatchProgress(null);
     }
   };
 
@@ -94,7 +140,10 @@ export default function Home() {
 
     try {
       const newImage = await fetchImage(prompt);
-      setGenerations((prev) => [...prev, newImage]);
+      setGenerations((prev) => [
+        ...prev,
+        newImage as { prompt: string; image: ImageResponse },
+      ]);
     } catch (error) {
       console.error("Error generating image:", error);
       alert("Error generating image. Please try again.");
@@ -103,41 +152,54 @@ export default function Home() {
 
   const handleBatchGenerate = async () => {
     const total = 1000;
+    const batchSize = 3; // Number of parallel requests
     setIsGenerating(true);
     setBatchProgress({ current: 0, total });
     const zip = new JSZip();
     abortControllerRef.current = new AbortController();
 
     try {
-      for (let i = 0; i < total; i++) {
+      for (let i = 0; i < total; i += batchSize) {
         if (abortControllerRef.current?.signal.aborted) {
           throw new Error("Generation cancelled");
         }
 
+        const batch = Array.from(
+          { length: Math.min(batchSize, total - i) },
+          (_, j) => i + j,
+        );
+
         try {
-          const result = await fetchImage(prompt);
-          if (!result?.image?.url) {
-            throw new Error("Failed to generate image");
+          // Generate images in parallel
+          const results = await Promise.all(
+            batch.map(async (index) => {
+              const result = (await fetchImage(prompt)) as {
+                image: ImageResponse;
+              };
+              if (!result?.image?.url) {
+                throw new Error("Failed to generate image");
+              }
+              return { index, result };
+            }),
+          );
+
+          // Process results
+          for (const { index, result } of results) {
+            const response = await fetch(
+              `/api/proxyImage?url=${encodeURIComponent(result.image.url)}`,
+            );
+            const imageBlob = await response.blob();
+            zip.file(`image-${index + 1}.jpg`, imageBlob);
           }
 
-          // Fetch the image as a blob
-          const response = await fetch(
-            `/api/proxyImage?url=${encodeURIComponent(result.image.url)}`,
-          );
-          const imageBlob = await response.blob();
-
-          // Add to zip with a numbered filename
-          zip.file(`image-${i + 1}.jpg`, imageBlob);
-
           setBatchProgress((prev) => ({
-            current: i + 1,
+            current: Math.min(i + batchSize, total),
             total,
           }));
 
-          // Give React time to update the UI
           await new Promise((resolve) => setTimeout(resolve, 0));
         } catch (error) {
-          console.error(`Error generating image ${i + 1}:`, error);
+          console.error(`Error generating batch starting at ${i}:`, error);
           continue;
         }
       }
@@ -158,6 +220,38 @@ export default function Home() {
 
   const handleStopGeneration = () => {
     abortControllerRef.current?.abort();
+  };
+
+  const handleDownloadZip = async () => {
+    if (generations.length === 0) return;
+
+    setBatchProgress({ current: 0, total: generations.length });
+    const zip = new JSZip();
+
+    try {
+      // Process all current generations
+      for (let i = 0; i < generations.length; i++) {
+        const generation = generations[i];
+        const response = await fetch(
+          `/api/proxyImage?url=${encodeURIComponent(generation.image.url)}`,
+        );
+        const imageBlob = await response.blob();
+        zip.file(`image-${i + 1}.jpg`, imageBlob);
+
+        setBatchProgress((prev) => ({
+          current: i + 1,
+          total: generations.length,
+        }));
+      }
+
+      const content = await zip.generateAsync({ type: "blob" });
+      saveAs(content, `${prompt.slice(0, 30)}-collection.zip`);
+    } catch (error) {
+      console.error("Error creating zip:", error);
+      alert("Error creating zip file. Please try again.");
+    } finally {
+      setBatchProgress(null);
+    }
   };
 
   return (
@@ -206,21 +300,40 @@ export default function Home() {
               Generate Image
             </Button>
             {prompt.trim() && (
-              <Button
-                type="button"
-                onClick={handleBatchGenerate}
-                className="bg-purple-600 hover:bg-purple-700"
-                disabled={!!batchProgress}
-              >
-                Generate 10k Pack
-              </Button>
+              <>
+                <Button
+                  type="button"
+                  onClick={handleBatchGenerate}
+                  className="bg-purple-600 hover:bg-purple-700"
+                  disabled={!!batchProgress}
+                >
+                  Generate 10k Pack
+                </Button>
+                {generations.length > 0 && (
+                  <Button
+                    type="button"
+                    onClick={handleDownloadZip}
+                    className="bg-green-600 hover:bg-green-700"
+                    disabled={!!batchProgress}
+                  >
+                    {batchProgress ? (
+                      <div className="flex items-center gap-2">
+                        <Spinner className="h-3 w-3" />
+                        Downloading...
+                      </div>
+                    ) : (
+                      "Download All"
+                    )}
+                  </Button>
+                )}
+              </>
             )}
           </div>
         </form>
       </div>
 
       <div className="flex w-full grow flex-col items-center justify-center space-y-4 px-4 pb-8 pt-4">
-        {batchProgress ? (
+        {batchProgress && isGenerating ? (
           <div className="w-full max-w-lg">
             <NFTProgress
               current={batchProgress.current}
