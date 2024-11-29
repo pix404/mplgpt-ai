@@ -1,18 +1,14 @@
 import Together from "together-ai";
 import { z } from "zod";
 import { Ratelimit } from "@upstash/ratelimit";
-import { Redis } from "ioredis";
-import { headers } from "next/headers";
 
-let ratelimit: Ratelimit | undefined;
+import { headers } from "next/headers";
+import RedisSingleton from "@/app/redis";
 
 // Add rate limiting if Upstash API keys are set, otherwise skip
-if (process.env.REDIS_URL) {
-  const redisUrl = process.env.REDIS_URL || "default_redis_url";
-  const redisClient = new Redis(redisUrl, {
-    lazyConnect: true,
-  }) as unknown as Redis;
-}
+// if (process.env.REDIS_URL) {
+//   const redisClient = RedisSingleton.getInstance();
+// }
 
 export async function POST(req: Request) {
   let json = await req.json();
@@ -36,28 +32,22 @@ export async function POST(req: Request) {
   }
 
   const client = new Together(options);
-  const redisUrl = process.env.REDIS_URL || "default_redis_url";
-  const redisClient = new Redis(redisUrl, {
-    lazyConnect: true,
-  }) as unknown as Redis;
+  const redisClient = await RedisSingleton.getInstance();
 
   if (userAPIKey) {
     client.apiKey = userAPIKey;
   }
 
-  if (ratelimit && !userAPIKey) {
-    const identifier = getIPAddress();
+  // if (!userAPIKey) {
+  //   const identifier = getIPAddress();
 
-    const { success } = await ratelimit.limit(identifier);
-    if (!success) {
-      return Response.json(
-        "No requests left. Please add your own API key or try again in 24h.",
-        {
-          status: 429,
-        },
-      );
-    }
-  }
+  //   return Response.json(
+  //     "No requests left. Please add your own API key or try again in 24h.",
+  //     {
+  //       status: 429,
+  //     },
+  //   );
+  // }
 
   let response;
   try {
@@ -87,9 +77,6 @@ export async function POST(req: Request) {
 
   return Response.json(response.data[0]);
 }
-
-export const runtime = "edge";
-
 function getIPAddress() {
   const FALLBACK_IP_ADDRESS = "0.0.0.0";
   const forwardedFor = headers().get("x-forwarded-for");

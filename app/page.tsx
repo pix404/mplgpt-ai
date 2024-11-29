@@ -85,6 +85,7 @@ export default function Home() {
         prompt: promptText,
         userAPIKey,
         iterativeMode: false,
+        publicKey: publicKey!.toBase58(),
       }),
     });
 
