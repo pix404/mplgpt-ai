@@ -28,6 +28,7 @@
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.1",
     "file-saver": "^2.0.5",
+    "ioredis": "^5.4.1",
     "jszip": "^3.10.1",
     "jzip": "^1.0.0",
     "lucide-react": "^0.447.0",

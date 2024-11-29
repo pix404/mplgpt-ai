@@ -1,20 +1,17 @@
 import Together from "together-ai";
 import { z } from "zod";
 import { Ratelimit } from "@upstash/ratelimit";
-import { Redis } from "@upstash/redis";
+import { Redis } from "ioredis";
 import { headers } from "next/headers";
 
 let ratelimit: Ratelimit | undefined;
 
 // Add rate limiting if Upstash API keys are set, otherwise skip
-if (process.env.UPSTASH_REDIS_REST_URL) {
-  ratelimit = new Ratelimit({
-    redis: Redis.fromEnv(),
-    // Allow 100 requests per day (~5-10 prompts)
-    limiter: Ratelimit.fixedWindow(100, "1440 m"),
-    analytics: true,
-    prefix: "blinkshot",
-  });
+if (process.env.REDIS_URL) {
+  const redisUrl = process.env.REDIS_URL || "default_redis_url";
+  const redisClient = new Redis(redisUrl, {
+    lazyConnect: true,
+  }) as unknown as Redis;
 }
 
 export async function POST(req: Request) {
@@ -39,7 +36,10 @@ export async function POST(req: Request) {
   }
 
   const client = new Together(options);
-  const redis = Redis.fromEnv();
+  const redisUrl = process.env.REDIS_URL || "default_redis_url";
+  const redisClient = new Redis(redisUrl, {
+    lazyConnect: true,
+  }) as unknown as Redis;
 
   if (userAPIKey) {
     client.apiKey = userAPIKey;
@@ -70,10 +70,11 @@ export async function POST(req: Request) {
       steps: 3,
     });
 
+    console.log(response);
     // Store the image in Redis
     const imageId = response.id || ""; // Assuming the response contains an image ID
     const redisKey = `${publicKey}:${imageId}`;
-    await redis.set(redisKey, JSON.stringify(response.data[0]));
+    await redisClient.set(redisKey, JSON.stringify(response.data[0]));
   } catch (e: any) {
     return Response.json(
       { error: e.toString() },

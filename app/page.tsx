@@ -3,7 +3,7 @@
 import { useQuery, QueryClient } from "@tanstack/react-query";
 import { useDebounce } from "@uidotdev/usehooks";
 import Image from "next/image";
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, Suspense } from "react";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
@@ -326,7 +326,9 @@ export default function Home() {
     <div className="mx-auto flex h-full max-w-7xl flex-col px-5">
       <header className="flex justify-center pt-20 md:justify-end md:pt-3">
         <div className="space-y-2">
-          <WalletMultiButton className="" />
+          <Suspense fallback={<div>Loading...</div>}>
+            <WalletMultiButton className="" />
+          </Suspense>
           <div>
             <label className="text-xs text-gray-200">
               [Optional] Add your{" "}

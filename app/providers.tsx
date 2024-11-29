@@ -14,7 +14,7 @@ import {
   QueryClient,
   QueryClientProvider,
 } from "@tanstack/react-query";
-import { ReactNode } from "react";
+import { ReactNode, Suspense } from "react";
 import toast, { Toaster } from "react-hot-toast";
 
 const queryClient = new QueryClient({
@@ -35,8 +35,10 @@ export default function Providers({ children }: { children: ReactNode }) {
       <WalletProvider wallets={[]}>
         <WalletModalProvider>
           <QueryClientProvider client={queryClient}>
-            {children}
-            <Toaster />
+            <Suspense fallback={<div>Loading...</div>}>
+              {children}
+              <Toaster />
+            </Suspense>
           </QueryClientProvider>
         </WalletModalProvider>
       </WalletProvider>
