@@ -324,7 +324,15 @@ export default function Home() {
   };
 
   return (
-    <div className="mx-auto flex h-full max-w-7xl flex-col px-5">
+    <div
+      className="mx-auto flex h-full max-w-7xl flex-col px-5"
+      style={{
+        backgroundImage: `url(pix_candymachine.png)`,
+        backgroundSize: `85%`,
+        backgroundRepeat: `no-repeat`,
+        backgroundPosition: `center`,
+      }}
+    >
       <header className="flex justify-center pt-20 md:justify-end md:pt-3">
         <div className="space-y-2">
           <Suspense fallback={<div>Loading...</div>}>

@@ -6,13 +6,9 @@ import PlausibleProvider from "next-plausible";
 import localFont from "next/font/local";
 import "./globals.css";
 
-const geistSans = localFont({
-  src: "./fonts/GeistVF.woff",
-  variable: "--font-geist-sans",
-});
-const geistMono = localFont({
-  src: "./fonts/GeistMonoVF.woff",
-  variable: "--font-geist-mono",
+const ocdMono = localFont({
+  src: "../public/fonts/VCR_OSD_MONO_1.001.ttf",
+  variable: "--font-ocd-mono",
 });
 
 let title = "MPLGPT – Real-Time AI Image Generator";
@@ -57,8 +53,13 @@ export default function RootLayout({
         <PlausibleProvider domain="mplgpt.ai" />
       </head>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} dark h-full min-h-full bg-[length:6px] font-mono text-gray-100 antialiased`}
-        style={{ backgroundImage: `url(${bgPattern.src}` }}
+        className={`${ocdMono.variable} h-full min-h-full font-mono text-gray-100 antialiased`}
+        style={{
+          backgroundImage: `url(footer_bg.png), url(candypix_bg.png)`,
+          backgroundSize: `100%, cover`,
+          backgroundRepeat: `no-repeat, no-repeat`,
+          backgroundPosition: `bottom, center`,
+        }}
       >
         <Providers>{children}</Providers>
       </body>

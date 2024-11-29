@@ -3,7 +3,6 @@
 @tailwind utilities;
 @layer base {
   :root {
-    --background: 0 0% 100%;
     --foreground: 0 0% 3.9%;
     --card: 0 0% 100%;
     --card-foreground: 0 0% 3.9%;
@@ -30,7 +29,7 @@
     --radius: 0.5rem;
   }
   .dark {
-    --background: 0 0% 8.24%;
+    
     --foreground: 0 0% 98%;
     --card: 0 0% 3.9%;
     --card-foreground: 0 0% 98%;
@@ -61,7 +60,13 @@
     @apply border-border;
   }
   body {
-    @apply bg-background text-foreground;
+    @apply text-foreground;
+    font-family: 'VCR OSD Mono', monospace;
+  
+    background-image: url('/public/candypix_bg.png');
+    background-size: cover;
+    background-repeat: no-repeat;
+    background-position: center;
   }
 }
 
@@ -108,4 +113,24 @@ dialog::backdrop {
   display: flex;
   justify-content: space-between;
   width: 100%;
+}
+
+@font-face {
+  font-family: 'VCR OSD Mono';
+  src: url('/public/fonts/VCR_OSD_MONO_1.001.ttf') format('truetype'); /* Adjust the path if necessary */
+  font-weight: normal;
+  font-style: normal;
+}
+
+.button {
+  background-color: #E02122;
+  color: #fff;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.button:hover {
+  background-color: #c01b1d;
 }
