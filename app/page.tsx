@@ -27,7 +27,7 @@ type ImageResponse = {
 };
 
 export default function Home() {
-  const { publicKey } = useWallet();
+  const { publicKey, disconnect } = useWallet();
   const [prompt, setPrompt] = useState("");
   const [userAPIKey, setUserAPIKey] = useState("");
   const [generations, setGenerations] = useState<
@@ -52,6 +52,12 @@ export default function Home() {
       });
     }
   }, [progressRef.current.current]);
+
+  useEffect(() => {
+    if (publicKey) {
+      console.log("Connected wallet public key:", publicKey.toBase58());
+    }
+  }, [publicKey]);
 
   // Calculate total pages
   const totalPages = Math.ceil(generations.length / imagesPerPage);
@@ -139,6 +145,10 @@ export default function Home() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!publicKey) {
+      alert("Please connect your wallet first");
+      return;
+    }
     if (!prompt.trim()) {
       alert("Please enter a prompt first");
       return;
@@ -157,6 +167,10 @@ export default function Home() {
   };
 
   const handleBatchGenerate = async () => {
+    if (!publicKey) {
+      alert("Please connect your wallet first");
+      return;
+    }
     const total = 1000;
     const batchSize = 3;
     setIsGenerating(true);

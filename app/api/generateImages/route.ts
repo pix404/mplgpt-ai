@@ -19,11 +19,12 @@ if (process.env.UPSTASH_REDIS_REST_URL) {
 
 export async function POST(req: Request) {
   let json = await req.json();
-  let { prompt, userAPIKey, iterativeMode } = z
+  let { prompt, userAPIKey, iterativeMode, publicKey } = z
     .object({
       prompt: z.string(),
       iterativeMode: z.boolean(),
       userAPIKey: z.string().optional(),
+      publicKey: z.string().optional(),
     })
     .parse(json);
 
@@ -38,6 +39,7 @@ export async function POST(req: Request) {
   }
 
   const client = new Together(options);
+  const redis = Redis.fromEnv();
 
   if (userAPIKey) {
     client.apiKey = userAPIKey;
@@ -67,6 +69,11 @@ export async function POST(req: Request) {
       seed: iterativeMode ? 123 : undefined,
       steps: 3,
     });
+
+    // Store the image in Redis
+    const imageId = response.id || ""; // Assuming the response contains an image ID
+    const redisKey = `${publicKey}:${imageId}`;
+    await redis.set(redisKey, JSON.stringify(response.data[0]));
   } catch (e: any) {
     return Response.json(
       { error: e.toString() },
