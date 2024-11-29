@@ -1,6 +1,15 @@
 "use client";
 
 import {
+  ConnectionProvider,
+  useWallet,
+  WalletProvider,
+} from "@solana/wallet-adapter-react";
+import {
+  WalletModalProvider,
+  WalletMultiButton,
+} from "@solana/wallet-adapter-ant-design";
+import {
   QueryCache,
   QueryClient,
   QueryClientProvider,
@@ -18,9 +27,19 @@ const queryClient = new QueryClient({
 
 export default function Providers({ children }: { children: ReactNode }) {
   return (
-    <QueryClientProvider client={queryClient}>
-      {children}
-      <Toaster />
-    </QueryClientProvider>
+    <ConnectionProvider
+      endpoint={
+        "https://solana-mainnet.core.chainstack.com/0c8257d8dca48ab362882555bc5b2d40"
+      }
+    >
+      <WalletProvider wallets={[]}>
+        <WalletModalProvider>
+          <QueryClientProvider client={queryClient}>
+            {children}
+            <Toaster />
+          </QueryClientProvider>
+        </WalletModalProvider>
+      </WalletProvider>
+    </ConnectionProvider>
   );
 }

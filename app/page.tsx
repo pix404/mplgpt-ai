@@ -15,7 +15,11 @@ import { NFTProgress } from "@/components/NFTProgress";
 import { saveAs } from "file-saver";
 import Spinner from "@/components/spinner";
 import { NFTMetadata } from "@/types/nft";
+import { WalletMultiButton } from "@solana/wallet-adapter-ant-design";
+require("@solana/wallet-adapter-ant-design/styles.css");
 
+import { useWallet } from "@solana/wallet-adapter-react";
+require("@solana/wallet-adapter-react-ui/styles.css");
 type ImageResponse = {
   index: number;
   url: string;
@@ -23,6 +27,7 @@ type ImageResponse = {
 };
 
 export default function Home() {
+  const { publicKey } = useWallet();
   const [prompt, setPrompt] = useState("");
   const [userAPIKey, setUserAPIKey] = useState("");
   const [generations, setGenerations] = useState<
@@ -307,6 +312,7 @@ export default function Home() {
     <div className="mx-auto flex h-full max-w-7xl flex-col px-5">
       <header className="flex justify-center pt-20 md:justify-end md:pt-3">
         <div className="space-y-2">
+          <WalletMultiButton className="" />
           <div>
             <label className="text-xs text-gray-200">
               [Optional] Add your{" "}

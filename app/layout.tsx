@@ -1,3 +1,4 @@
+import React from "react";
 import Providers from "@/app/providers";
 import bgPattern from "@/public/bg-pattern-transparent.png";
 import type { Metadata } from "next";
