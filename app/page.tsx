@@ -5,7 +5,6 @@ import { useDebounce } from "@uidotdev/usehooks";
 import Image from "next/image";
 import { useEffect, useState, useRef, Suspense } from "react";
 import { Input } from "@/components/ui/input";
-import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { ImageGrid } from "@/components/ImageGrid";
 import JSZip from "jszip";
@@ -16,33 +15,36 @@ import { saveAs } from "file-saver";
 import Spinner from "@/components/spinner";
 import { NFTMetadata } from "@/types/nft";
 import { WalletMultiButton } from "@solana/wallet-adapter-ant-design";
-require("@solana/wallet-adapter-ant-design/styles.css");
-
 import { useWallet } from "@solana/wallet-adapter-react";
-require("@solana/wallet-adapter-react-ui/styles.css");
+import "@solana/wallet-adapter-ant-design/styles.css";
+import "@solana/wallet-adapter-react-ui/styles.css";
+
 type ImageResponse = {
   index: number;
   url: string;
   timings: { inference: number };
 };
 
+type Generation = {
+  prompt: string;
+  image: ImageResponse;
+};
+
+type BatchProgress = {
+  current: number;
+  total: number;
+} | null;
+
 export default function Home() {
   const { publicKey, disconnect } = useWallet();
   const [prompt, setPrompt] = useState("");
-  const [userAPIKey, setUserAPIKey] = useState("");
-  const [generations, setGenerations] = useState<
-    { prompt: string; image: ImageResponse }[]
-  >([]);
+  const [generations, setGenerations] = useState<Generation[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const imagesPerPage = 4;
-  const [batchProgress, setBatchProgress] = useState<{
-    current: number;
-    total: number;
-  } | null>(null);
+  const [batchProgress, setBatchProgress] = useState<BatchProgress>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const abortControllerRef = useRef<AbortController | null>(null);
-
-  const progressRef = useRef({ current: 0, total: 0 });
+  const progressRef = useRef<{ current: number; total: number }>({ current: 0, total: 0 });
 
   useEffect(() => {
     if (progressRef.current.current > 0) {
@@ -59,46 +61,28 @@ export default function Home() {
     }
   }, [publicKey]);
 
-  // Calculate total pages
-  const totalPages = Math.ceil(generations.length / imagesPerPage);
-
-  // Get current page's images
-  const indexOfLastImage = currentPage * imagesPerPage;
-  const indexOfFirstImage = indexOfLastImage - imagesPerPage;
-  const currentImages = generations.slice(indexOfFirstImage, indexOfLastImage);
-
   const queryClient = new QueryClient();
 
   const fetchImage = async (promptText: string) => {
     const queryKey = ["image", promptText];
-
-    // Check cache first
-    const cachedData = queryClient.getQueryData(queryKey);
-    if (cachedData) {
-      return cachedData;
-    }
+    const cachedData = queryClient.getQueryData<Generation>(queryKey);
+    if (cachedData) return cachedData;
 
     const res = await fetch("/api/generateImages", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         prompt: promptText,
-        userAPIKey,
         iterativeMode: false,
         publicKey: publicKey!.toBase58(),
       }),
     });
 
-    if (!res.ok) {
-      throw new Error(await res.text());
-    }
+    if (!res.ok) throw new Error(await res.text());
 
     const newImage = await res.json();
-    const result = { prompt: promptText, image: newImage };
-
-    // Cache the result
+    const result: Generation = { prompt: promptText, image: newImage };
     queryClient.setQueryData(queryKey, result);
-
     return result;
   };
 
@@ -107,20 +91,18 @@ export default function Home() {
     setBatchProgress({ current: 0, total: amount });
 
     try {
-      const batchSize = 3; // Number of parallel requests
-
+      const batchSize = 3;
       for (let i = 0; i < amount; i += batchSize) {
         const batch = Array.from(
           { length: Math.min(batchSize, amount - i) },
-          (_, j) => i + j,
+          (_, j) => i + j
         );
 
-        // Generate images in parallel
         const results = await Promise.all(
           batch.map(async () => {
             const result = await fetchImage(promptText);
-            return result as { prompt: string; image: ImageResponse };
-          }),
+            return result;
+          })
         );
 
         setGenerations((prev) => [...prev, ...results]);
@@ -129,11 +111,9 @@ export default function Home() {
           total: amount,
         }));
 
-        // Small delay between batches
         await new Promise((resolve) => setTimeout(resolve, 100));
       }
 
-      // Reset to first page when done
       setCurrentPage(1);
     } catch (error) {
       console.error("Error generating images:", error);
@@ -144,7 +124,7 @@ export default function Home() {
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!publicKey) {
       alert("Please connect your wallet first");
@@ -157,10 +137,7 @@ export default function Home() {
 
     try {
       const newImage = await fetchImage(prompt);
-      setGenerations((prev) => [
-        ...prev,
-        newImage as { prompt: string; image: ImageResponse },
-      ]);
+      setGenerations((prev) => [...prev, newImage]);
     } catch (error) {
       console.error("Error generating image:", error);
       alert("Error generating image. Please try again.");
@@ -187,65 +164,48 @@ export default function Home() {
 
         const batch = Array.from(
           { length: Math.min(batchSize, total - i) },
-          (_, j) => i + j,
+          (_, j) => i + j
         );
 
-        try {
-          // Generate images in parallel
-          const results = await Promise.all(
-            batch.map(async (index) => {
-              const result = (await fetchImage(prompt)) as {
-                image: ImageResponse;
-              };
-              if (!result?.image?.url) {
-                throw new Error("Failed to generate image");
-              }
+        const results = await Promise.all(
+          batch.map(async (index) => {
+            const result = await fetchImage(prompt);
+            if (!result?.image?.url) throw new Error("Failed to generate image");
 
-              // Fetch the actual image data
-              const response = await fetch(result.image.url);
-              if (!response.ok) {
-                throw new Error("Failed to fetch image data");
-              }
-              const imageBlob = await response.blob();
+            const response = await fetch(result.image.url);
+            if (!response.ok) throw new Error("Failed to fetch image data");
+            const imageBlob = await response.blob();
 
-              return { index, imageBlob, result };
-            }),
-          );
+            return { index, imageBlob, result };
+          })
+        );
 
-          // Process results
-          for (const { index, imageBlob, result } of results) {
-            // Add image to zip
-            zip.file(`${index + 1}.jpg`, imageBlob);
+        for (const { index, imageBlob, result } of results) {
+          zip.file(`${index + 1}.jpg`, imageBlob);
 
-            // Create and add metadata
-            const metadata: NFTMetadata = {
-              name: `${prompt.slice(0, 30)} #${index + 1}`,
-              description: prompt,
-              image: `${index + 1}.jpg`,
-              attributes: [
-                {
-                  prompt: prompt,
-                  model: "black-forest-labs/FLUX.1-schnell",
-                  timestamp: new Date().toISOString(),
-                  index: index + 1,
-                },
-              ],
-            };
+          const metadata: NFTMetadata = {
+            name: `${prompt.slice(0, 30)} #${index + 1}`,
+            description: prompt,
+            image: `${index + 1}.jpg`,
+            attributes: [
+              {
+                prompt: prompt,
+                model: "black-forest-labs/FLUX.1-schnell",
+                timestamp: new Date().toISOString(),
+                index: index + 1,
+              },
+            ],
+          };
 
-            // Add metadata JSON file
-            zip.file(`${index + 1}.json`, JSON.stringify(metadata, null, 2));
-          }
-
-          setBatchProgress((prev) => ({
-            current: Math.min(i + batchSize, total),
-            total,
-          }));
-
-          await new Promise((resolve) => setTimeout(resolve, 0));
-        } catch (error) {
-          console.error(`Error generating batch starting at ${i}:`, error);
-          continue;
+          zip.file(`${index + 1}.json`, JSON.stringify(metadata, null, 2));
         }
+
+        setBatchProgress((prev) => ({
+          current: Math.min(i + batchSize, total),
+          total,
+        }));
+
+        await new Promise((resolve) => setTimeout(resolve, 0));
       }
 
       const content = await zip.generateAsync({ type: "blob" });
@@ -273,23 +233,16 @@ export default function Home() {
     const zip = new JSZip();
 
     try {
-      // Process all current generations
       for (let i = 0; i < generations.length; i++) {
         const generation = generations[i];
-
-        // Use proxy endpoint to fetch the image data
         const response = await fetch(
-          `/api/proxyImage?url=${encodeURIComponent(generation.image.url)}`,
+          `/api/proxyImage?url=${encodeURIComponent(generation.image.url)}`
         );
-        if (!response.ok) {
-          throw new Error("Failed to fetch image data");
-        }
+        if (!response.ok) throw new Error("Failed to fetch image data");
         const imageBlob = await response.blob();
 
-        // Add image to zip
         zip.file(`${i + 1}.jpg`, imageBlob);
 
-        // Create and add metadata
         const metadata: NFTMetadata = {
           name: `${prompt.slice(0, 30)} #${i + 1}`,
           description: prompt,
@@ -304,9 +257,7 @@ export default function Home() {
           ],
         };
 
-        // Add metadata JSON file
         zip.file(`${i + 1}.json`, JSON.stringify(metadata, null, 2));
-
         setBatchProgress((prev) => ({
           current: i + 1,
           total: generations.length,
@@ -324,150 +275,114 @@ export default function Home() {
   };
 
   return (
-    <div
-      className="mx-auto flex h-full max-w-7xl flex-col px-5"
-      style={{
-        backgroundImage: `url(pix_candymachine.png)`,
-        backgroundSize: `85%`,
-        backgroundRepeat: `no-repeat`,
-        backgroundPosition: `center`,
-      }}
-    >
-      <header className="flex justify-center pt-20 md:justify-end md:pt-3">
-        <div className="space-y-2">
+    <div className="min-h-screen bg-black text-white">
+      <div className="mx-auto flex max-w-7xl flex-col px-5">
+        <header className="flex items-center justify-between border-b border-white/10 py-2">
+          <h1 className="text-xl font-normal text-white">PIX404 NFT Generator</h1>
           <Suspense fallback={<div>Loading...</div>}>
-            <WalletMultiButton className="" />
+            <WalletMultiButton className="vs-button" />
           </Suspense>
-          <div>
-            <label className="text-xs text-gray-200">
-              [Optional] Add your{" "}
-              <a
-                href="https://api.together.xyz/settings/api-keys"
-                target="_blank"
-                className="underline underline-offset-4 transition hover:text-blue-500"
-              >
-                Together API Key
-              </a>
-            </label>
-            <Input
-              placeholder="Together API Key"
-              type="password"
-              value={userAPIKey}
-              className="mt-1 bg-gray-400 text-gray-200 placeholder:text-gray-300"
-              onChange={(e) => setUserAPIKey(e.target.value)}
-            />
-          </div>
-        </div>
-      </header>
+        </header>
 
-      <div className="flex justify-center px-4 sm:px-6 lg:px-8">
-        <form className="mt-10 w-full max-w-lg" onSubmit={handleSubmit}>
-          <fieldset>
-            <div className="relative">
-              <Textarea
-                rows={4}
-                spellCheck={false}
-                placeholder="Describe your image..."
-                required
-                value={prompt}
-                onChange={(e) => setPrompt(e.target.value)}
-                className="w-full resize-none border-gray-300 border-opacity-50 bg-gray-400 px-4 text-base placeholder-gray-300"
-              />
-            </div>
-          </fieldset>
-          <div className="mt-4 flex gap-2">
-            <Button type="submit" className="bg-blue-600 hover:bg-blue-700">
-              Generate Image
-            </Button>
-            {prompt.trim() && (
-              <>
-                <Button
-                  type="button"
-                  onClick={handleBatchGenerate}
-                  className="bg-purple-600 hover:bg-purple-700"
-                  disabled={!!batchProgress}
-                >
-                  Generate 10k Pack
-                </Button>
-                {generations.length > 0 && (
+        <main className="mt-6">
+          <form className="vs-container p-4" onSubmit={handleSubmit}>
+            <Textarea
+              rows={4}
+              spellCheck={false}
+              placeholder="Describe your image..."
+              required
+              value={prompt}
+              onChange={(e) => setPrompt(e.target.value)}
+              className="vs-input mb-4 w-full resize-none"
+            />
+            <div className="flex gap-2">
+              <Button type="submit" className="vs-button">
+                Generate Image
+              </Button>
+              {prompt.trim() && (
+                <>
                   <Button
                     type="button"
-                    onClick={handleDownloadZip}
-                    className="bg-green-600 hover:bg-green-700"
+                    onClick={handleBatchGenerate}
+                    className="vs-button"
                     disabled={!!batchProgress}
                   >
-                    {batchProgress ? (
-                      <div className="flex items-center gap-2">
-                        <Spinner className="h-3 w-3" />
-                        Downloading...
-                      </div>
-                    ) : (
-                      "Download All"
-                    )}
+                    Generate 10k Pack
                   </Button>
+                  {generations.length > 0 && (
+                    <Button
+                      type="button"
+                      onClick={handleDownloadZip}
+                      className="vs-button"
+                      disabled={!!batchProgress}
+                    >
+                      {batchProgress ? (
+                        <div className="flex items-center gap-2">
+                          <Spinner className="h-3 w-3" />
+                          Downloading...
+                        </div>
+                      ) : (
+                        "Download All"
+                      )}
+                    </Button>
+                  )}
+                </>
+              )}
+            </div>
+          </form>
+
+          <div className="mt-6">
+            {batchProgress && isGenerating ? (
+              <div className="vs-container p-4">
+                <NFTProgress current={batchProgress.current} total={batchProgress.total} />
+                <Button onClick={handleStopGeneration} className="mt-4 vs-button bg-red-600 hover:bg-red-700">
+                  Stop Generation
+                </Button>
+              </div>
+            ) : (
+              <>
+                <div className="vs-container p-4">
+                  <ImageGrid
+                    images={generations.slice(
+                      (currentPage - 1) * imagesPerPage,
+                      currentPage * imagesPerPage
+                    )}
+                    onGenerateMore={handleGenerateMore}
+                    onImageClick={() => {}}
+                  />
+                </div>
+                {generations.length > 0 && (
+                  <div className="mt-4 flex items-center justify-center gap-4">
+                    <button
+                      onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                      disabled={currentPage === 1}
+                      className="vs-button disabled:opacity-50"
+                    >
+                      Previous
+                    </button>
+                    <span className="text-white">
+                      {currentPage} of {Math.ceil(generations.length / imagesPerPage)}
+                    </span>
+                    <button
+                      onClick={() =>
+                        setCurrentPage(
+                          Math.min(
+                            Math.ceil(generations.length / imagesPerPage),
+                            currentPage + 1
+                          )
+                        )
+                      }
+                      disabled={currentPage === Math.ceil(generations.length / imagesPerPage)}
+                      className="vs-button disabled:opacity-50"
+                    >
+                      Next
+                    </button>
+                  </div>
                 )}
               </>
             )}
           </div>
-        </form>
-      </div>
-
-      <div className="flex w-full grow flex-col items-center justify-center space-y-4 px-4 pb-8 pt-4">
-        {batchProgress && isGenerating ? (
-          <div className="w-full max-w-lg">
-            <NFTProgress
-              current={batchProgress.current}
-              total={batchProgress.total}
-            />
-            <Button
-              onClick={handleStopGeneration}
-              className="mt-4 bg-red-600 hover:bg-red-700"
-            >
-              Stop Generation
-            </Button>
-          </div>
-        ) : (
-          <>
-            <ImageGrid
-              images={generations.slice(
-                (currentPage - 1) * imagesPerPage,
-                currentPage * imagesPerPage,
-              )}
-              onGenerateMore={handleGenerateMore}
-              onImageClick={() => {}}
-            />
-            <div className="mb-4 flex items-center gap-4">
-              <button
-                onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-                disabled={currentPage === 1}
-                className="hover:bg-gray-700 rounded bg-gray-600 px-4 py-2 text-white disabled:opacity-50"
-              >
-                Previous
-              </button>
-
-              <span className="text-sm text-gray-300">
-                {currentPage} of {Math.ceil(generations.length / imagesPerPage)}
-              </span>
-
-              <button
-                onClick={() =>
-                  setCurrentPage(
-                    Math.min(
-                      Math.ceil(generations.length / imagesPerPage),
-                      currentPage + 1,
-                    ),
-                  )
-                }
-                disabled={
-                  currentPage === Math.ceil(generations.length / imagesPerPage)
-                }
-                className="hover:bg-gray-700 rounded bg-gray-600 px-4 py-2 text-white disabled:opacity-50"
-              >
-                Next
-              </button>
-            </div>
-          </>
-        )}
+        </main>
       </div>
     </div>
   );

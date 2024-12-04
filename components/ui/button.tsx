@@ -1,29 +1,28 @@
 import * as React from "react";
 import { Slot } from "@radix-ui/react-slot";
 import { cva, type VariantProps } from "class-variance-authority";
-
 import { cn } from "@/lib/utils";
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium transition-[colors,opacity] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring  disabled:cursor-not-allowed disabled:opacity-50",
+  "inline-flex items-center justify-center whitespace-nowrap text-sm font-medium transition-colors focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50",
   {
     variants: {
       variant: {
         default:
-          "bg-primary text-primary-foreground shadow enabled:hover:bg-primary/90",
+          "bg-[#0e639c] text-white hover:bg-[#1177bb] shadow-none rounded-none",
         destructive:
-          "bg-destructive text-destructive-foreground shadow-sm enabled:hover:bg-destructive/90",
+          "bg-[#c72e0f] text-white hover:bg-[#d9331a] shadow-none rounded-none",
         outline:
-          "border border-input bg-background shadow-sm enabled:hover:bg-accent enabled:hover:text-accent-foreground",
+          "border border-[#3c3c3c] bg-transparent hover:bg-[#3c3c3c] shadow-none rounded-none",
         secondary:
-          "bg-secondary text-secondary-foreground shadow-sm enabled:hover:bg-secondary/80",
-        ghost: "enabled:hover:bg-accent enabled:hover:text-accent-foreground",
-        link: "text-primary underline-offset-4 enabled:hover:underline",
+          "bg-[#3c3c3c] text-white hover:bg-[#4a4a4a] shadow-none rounded-none",
+        ghost: "hover:bg-[#3c3c3c] hover:text-white shadow-none rounded-none",
+        link: "text-[#0e639c] underline-offset-4 hover:underline",
       },
       size: {
         default: "h-9 px-4 py-2",
-        sm: "h-8 rounded-md px-3 text-xs",
-        lg: "h-10 rounded-md px-8",
+        sm: "h-8 px-3 text-xs",
+        lg: "h-10 px-8",
         icon: "h-9 w-9",
       },
     },
@@ -31,7 +30,7 @@ const buttonVariants = cva(
       variant: "default",
       size: "default",
     },
-  },
+  }
 );
 
 export interface ButtonProps
@@ -50,8 +49,9 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
         {...props}
       />
     );
-  },
+  }
 );
+
 Button.displayName = "Button";
 
 export { Button, buttonVariants };

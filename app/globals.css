@@ -1,73 +1,73 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
 @layer base {
   :root {
-    --foreground: 0 0% 3.9%;
-    --card: 0 0% 100%;
-    --card-foreground: 0 0% 3.9%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 0 0% 3.9%;
-    --primary: 0 0% 9%;
-    --primary-foreground: 0 0% 98%;
-    --secondary: 0 0% 96.1%;
-    --secondary-foreground: 0 0% 9%;
-    --muted: 0 0% 96.1%;
-    --muted-foreground: 0 0% 45.1%;
-    --accent: 0 0% 96.1%;
-    --accent-foreground: 0 0% 9%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 89.8%;
-    --input: 0 0% 89.8%;
-    --ring: 0 0% 3.9%;
-    --chart-1: 12 76% 61%;
-    --chart-2: 173 58% 39%;
-    --chart-3: 197 37% 24%;
-    --chart-4: 43 74% 66%;
-    --chart-5: 27 87% 67%;
-    --radius: 0.5rem;
-  }
-  .dark {
-    
-    --foreground: 0 0% 98%;
-    --card: 0 0% 3.9%;
-    --card-foreground: 0 0% 98%;
-    --popover: 0 0% 3.9%;
-    --popover-foreground: 0 0% 98%;
-    --primary: 0 0% 98%;
-    --primary-foreground: 0 0% 9%;
-    --secondary: 0 0% 14.9%;
-    --secondary-foreground: 0 0% 98%;
-    --muted: 0 0% 14.9%;
-    --muted-foreground: 0 0% 63.9%;
-    --accent: 0 0% 14.9%;
-    --accent-foreground: 0 0% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 14.9%;
-    --input: 0 0% 14.9%;
-    --ring: 0 0% 83.1%;
-    --chart-1: 220 70% 50%;
-    --chart-2: 160 60% 45%;
-    --chart-3: 30 80% 55%;
-    --chart-4: 280 65% 60%;
-    --chart-5: 340 75% 55%;
+    --background: 0 0% 0%;
+    --foreground: 0 0% 100%;
+    --card: 0 0% 0%;
+    --card-foreground: 0 0% 100%;
+    --popover: 0 0% 0%;
+    --popover-foreground: 0 0% 100%;
+    --primary: 0 0% 100%;
+    --primary-foreground: 0 0% 0%;
+    --secondary: 0 0% 0%;
+    --secondary-foreground: 0 0% 100%;
+    --muted: 0 0% 0%;
+    --muted-foreground: 0 0% 70%;
+    --accent: 0 0% 0%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 0 0% 100%;
+    --input: 0 0% 0%;
+    --ring: 0 0% 100%;
   }
 }
+
 @layer base {
   * {
-    @apply border-border;
+    @apply border-white/10;
   }
   body {
-    @apply text-foreground;
-    font-family: 'VCR OSD Mono', monospace;
-  
-    background-image: url('/public/candypix_bg.png');
-    background-size: cover;
-    background-repeat: no-repeat;
-    background-position: center;
+    @apply bg-black text-white;
+    font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
   }
+}
+
+/* VS Code-like scrollbar */
+::-webkit-scrollbar {
+  width: 14px;
+}
+
+::-webkit-scrollbar-track {
+  background: #000000;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #ffffff;
+  border: 3px solid #000000;
+  border-radius: 7px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #ffffff;
+}
+
+/* VS Code-like input and textarea */
+.vs-input {
+  @apply bg-black border-white/10 text-white rounded-none focus:border-white focus:ring-1 focus:ring-white;
+}
+
+/* VS Code-like button */
+.vs-button {
+  @apply bg-black hover:bg-white hover:text-black text-white rounded-none px-4 py-2 font-normal border border-white/10;
+}
+
+/* VS Code-like container */
+.vs-container {
+  @apply bg-black border border-white/10;
 }
 
 @keyframes spinner {
@@ -79,58 +79,22 @@
   }
 }
 
-dialog {
-  padding: 20px;
-  border: none;
-  border-radius: 8px;
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-  background-color: white;
-  max-width: 400px;
-  margin: auto;
-}
-
-dialog::backdrop {
-  background-color: rgba(0, 0, 0, 0.5);
-}
-
 .dialog-content {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
+  @apply bg-black text-white;
 }
 
 .dialog-header {
-  font-size: 18px;
-  font-weight: bold;
-  margin-bottom: 10px;
+  @apply text-white font-normal;
 }
 
 .dialog-body {
-  margin-bottom: 20px;
+  @apply text-white;
 }
 
 .dialog-footer {
-  display: flex;
-  justify-content: space-between;
-  width: 100%;
+  @apply border-t border-white/10;
 }
 
-@font-face {
-  font-family: 'VCR OSD Mono';
-  src: url('/public/fonts/VCR_OSD_MONO_1.001.ttf') format('truetype'); /* Adjust the path if necessary */
-  font-weight: normal;
-  font-style: normal;
-}
-
-.button {
-  background-color: #E02122;
-  color: #fff;
-  border: none;
-  padding: 10px 20px;
-  border-radius: 5px;
-  cursor: pointer;
-}
-
-.button:hover {
-  background-color: #c01b1d;
+.wallet-adapter-button {
+  @apply bg-black hover:bg-white hover:text-black text-white rounded-none border border-white/10 !important;
 }

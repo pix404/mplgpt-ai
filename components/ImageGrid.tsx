@@ -1,100 +1,58 @@
-"use client";
-
 import Image from "next/image";
-import { Button } from "./ui/button";
-import { Dialog, DialogContent } from "./ui/dialog";
-import { useState } from "react";
-import {
-  ContextMenu,
-  ContextMenuContent,
-  ContextMenuItem,
-  ContextMenuTrigger,
-} from "./ui/context-menu";
-
-interface ImageResponse {
-  url: string;
-  index: number;
-}
+import { Button } from "@/components/ui/button";
 
 interface ImageGridProps {
-  images: { prompt: string; image: ImageResponse }[];
-  onGenerateMore: (promptText: string, amount: number) => Promise<void>;
-
-  onImageClick: (url: string) => void;
-  selectedImage?: string;
+  images: Array<{
+    prompt: string;
+    image: {
+      url: string;
+      timings: { inference: number };
+    };
+  }>;
+  onGenerateMore: (prompt: string, amount: number) => void;
+  onImageClick: (image: string) => void;
 }
 
-export function ImageGrid({
-  images,
-  onGenerateMore,
-  onImageClick,
-  selectedImage,
-}: ImageGridProps) {
-  const handleGenerateAmount = async (prompt: string, amount: number) => {
-    await onGenerateMore(prompt, amount);
-  };
+export function ImageGrid({ images, onGenerateMore, onImageClick }: ImageGridProps) {
+  if (images.length === 0) {
+    return (
+      <div className="flex h-48 items-center justify-center text-white/50">
+        No images generated yet. Start by entering a prompt above.
+      </div>
+    );
+  }
 
   return (
-    <>
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-        {images.map((item, index) => (
-          <ContextMenu key={`${item.image.url}-${index}`}>
-            <ContextMenuTrigger>
-              <div
-                className={`relative aspect-square w-full ${
-                  selectedImage === item.image.url ? "ring-2 ring-blue-500" : ""
-                }`}
-              >
-                <Image
-                  src={item.image.url}
-                  alt={item.prompt}
-                  width={1024}
-                  height={1024}
-                  sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw"
-                  className="rounded-lg object-cover"
-                  onClick={() => onImageClick(item.image.url)}
-                />
-              </div>
-            </ContextMenuTrigger>
-            <ContextMenuContent>
-              <ContextMenuItem
-                onClick={() => handleGenerateAmount(item.prompt, 10)}
-              >
-                Generate 10
-              </ContextMenuItem>
-              <ContextMenuItem
-                onClick={() => handleGenerateAmount(item.prompt, 100)}
-              >
-                Generate 100
-              </ContextMenuItem>
-              <ContextMenuItem
-                onClick={() => handleGenerateAmount(item.prompt, 1000)}
-              >
-                Generate 1,000
-              </ContextMenuItem>
-              <ContextMenuItem
-                onClick={() => handleGenerateAmount(item.prompt, 10000)}
-              >
-                Generate 10,000
-              </ContextMenuItem>
-            </ContextMenuContent>
-          </ContextMenu>
-        ))}
-      </div>
-
-      <Dialog open={!!selectedImage} onOpenChange={() => onImageClick("")}>
-        <DialogContent className="max-w-4xl">
-          {selectedImage && (
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+      {images.map((generation, i) => (
+        <div
+          key={i}
+          className="group relative overflow-hidden border border-white/10 bg-black"
+        >
+          <div className="relative aspect-[4/3]">
             <Image
-              src={selectedImage}
-              alt="Selected image"
-              width={1024}
-              height={1024}
-              className="rounded-lg"
+              src={generation.image.url}
+              alt={generation.prompt}
+              fill
+              className="object-cover"
+              onClick={() => onImageClick(generation.image.url)}
             />
-          )}
-        </DialogContent>
-      </Dialog>
-    </>
+          </div>
+          <div className="absolute inset-x-0 bottom-0 bg-black/80 p-2 opacity-0 transition-opacity group-hover:opacity-100">
+            <p className="text-xs text-white line-clamp-2">{generation.prompt}</p>
+            <div className="mt-2 flex justify-end gap-2">
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={() => onGenerateMore(generation.prompt, 4)}
+                className="vs-button"
+              >
+                Generate More
+              </Button>
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
   );
 }
