@@ -2,10 +2,16 @@
 
 import { Navigation } from "@/components/Navigation";
 import { WalletMultiButton } from "@solana/wallet-adapter-ant-design";
-import { Suspense } from "react";
+import { Suspense, useEffect, useState } from "react";
 
 export default function ProfilePage() {
-  const domain = process.env.NEXT_PUBLIC_DOMAIN || "mplgpt.ai";
+  const [domain, setDomain] = useState("mplgpt.ai");
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setDomain(window.location.hostname);
+    }
+  }, []);
 
   return (
     <div className="min-h-screen bg-black text-white">

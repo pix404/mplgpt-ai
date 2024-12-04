@@ -48,7 +48,13 @@ export default function Home() {
   const [isGenerating, setIsGenerating] = useState(false);
   const abortControllerRef = useRef<AbortController | null>(null);
   const progressRef = useRef<{ current: number; total: number }>({ current: 0, total: 0 });
-  const domain = process.env.NEXT_PUBLIC_DOMAIN || "mplgpt.ai";
+  const [domain, setDomain] = useState("mplgpt.ai");
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setDomain(window.location.hostname);
+    }
+  }, []);
 
   useEffect(() => {
     if (progressRef.current.current > 0) {
