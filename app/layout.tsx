@@ -1,6 +1,5 @@
 import React, { Suspense } from "react";
-import Providers from "@/app/providers";
-import bgPattern from "@/public/bg-pattern-transparent.png";
+import Providers from "./providers";
 import type { Metadata } from "next";
 import PlausibleProvider from "next-plausible";
 import localFont from "next/font/local";
@@ -11,18 +10,19 @@ const ocdMono = localFont({
   variable: "--font-ocd-mono",
 });
 
-let title = "Solana NFT AI Studio – Real-Time AI Image Generator";
+const domain = process.env.NEXT_PUBLIC_DOMAIN || "mplgpt.ai";
+let title = `${domain} - Solana NFT AI Studio`;
 let description = "Generate images with AI in milliseconds";
-let url = "https://www.mycandy.studio/";
-let ogimage = "https://www.mycandy.studio/pix-logo.svg";
-let sitename = "mycandy.studio";
+let url = `https://${domain}`;
+let ogimage = "/pix-logo.svg";
+let sitename = domain;
 
 export const metadata: Metadata = {
   metadataBase: new URL(url),
   title,
   description,
   icons: {
-    icon: "/favicon.ico",
+    icon: "/pix-logo.svg",
   },
   openGraph: {
     images: [ogimage],
@@ -50,17 +50,9 @@ export default function RootLayout({
     <html lang="en" className="h-full">
       <head>
         <meta name="color-scheme" content="dark" />
-        <PlausibleProvider domain="mplgpt.ai" />
+        <PlausibleProvider domain={domain} />
       </head>
-      <body
-        className={`${ocdMono.variable} h-full min-h-full font-mono text-gray-100 antialiased`}
-        style={{
-          backgroundImage: `url(footer_bg.png), url(candypix_bg.png)`,
-          backgroundSize: `100%, cover`,
-          backgroundRepeat: `no-repeat, no-repeat`,
-          backgroundPosition: `bottom, center`,
-        }}
-      >
+      <body className={`${ocdMono.variable} h-full min-h-full font-mono text-white antialiased bg-black`}>
         <Providers>{children}</Providers>
       </body>
     </html>

@@ -7,6 +7,7 @@ import { useEffect, useState, useRef, Suspense } from "react";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { ImageGrid } from "@/components/ImageGrid";
+import { Navigation } from "@/components/Navigation";
 import JSZip from "jszip";
 import { Button } from "@/components/ui/button";
 import { Pagination } from "@/components/Pagination";
@@ -35,6 +36,8 @@ type BatchProgress = {
   total: number;
 } | null;
 
+const queryClient = new QueryClient();
+
 export default function Home() {
   const { publicKey, disconnect } = useWallet();
   const [prompt, setPrompt] = useState("");
@@ -45,6 +48,7 @@ export default function Home() {
   const [isGenerating, setIsGenerating] = useState(false);
   const abortControllerRef = useRef<AbortController | null>(null);
   const progressRef = useRef<{ current: number; total: number }>({ current: 0, total: 0 });
+  const domain = process.env.NEXT_PUBLIC_DOMAIN || "mplgpt.ai";
 
   useEffect(() => {
     if (progressRef.current.current > 0) {
@@ -60,8 +64,6 @@ export default function Home() {
       console.log("Connected wallet public key:", publicKey.toBase58());
     }
   }, [publicKey]);
-
-  const queryClient = new QueryClient();
 
   const fetchImage = async (promptText: string) => {
     const queryKey = ["image", promptText];
@@ -84,6 +86,26 @@ export default function Home() {
     const result: Generation = { prompt: promptText, image: newImage };
     queryClient.setQueryData(queryKey, result);
     return result;
+  };
+
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!publicKey) {
+      alert("Please connect your wallet first");
+      return;
+    }
+    if (!prompt.trim()) {
+      alert("Please enter a prompt first");
+      return;
+    }
+
+    try {
+      const newImage = await fetchImage(prompt);
+      setGenerations((prev) => [...prev, newImage]);
+    } catch (error) {
+      console.error("Error generating image:", error);
+      alert("Error generating image. Please try again.");
+    }
   };
 
   const handleGenerateMore = async (promptText: string, amount: number) => {
@@ -121,26 +143,6 @@ export default function Home() {
     } finally {
       setIsGenerating(false);
       setBatchProgress(null);
-    }
-  };
-
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    if (!publicKey) {
-      alert("Please connect your wallet first");
-      return;
-    }
-    if (!prompt.trim()) {
-      alert("Please enter a prompt first");
-      return;
-    }
-
-    try {
-      const newImage = await fetchImage(prompt);
-      setGenerations((prev) => [...prev, newImage]);
-    } catch (error) {
-      console.error("Error generating image:", error);
-      alert("Error generating image. Please try again.");
     }
   };
 
@@ -278,7 +280,10 @@ export default function Home() {
     <div className="min-h-screen bg-black text-white">
       <div className="mx-auto flex max-w-7xl flex-col px-5">
         <header className="flex items-center justify-between border-b border-white/10 py-2">
-          <h1 className="text-xl font-normal text-white">PIX404 NFT Generator</h1>
+          <div className="flex items-center space-x-8">
+            <h1 className="text-xl font-normal text-white">{domain} - Solana NFT AI Studio</h1>
+            <Navigation />
+          </div>
           <Suspense fallback={<div>Loading...</div>}>
             <WalletMultiButton className="vs-button" />
           </Suspense>
