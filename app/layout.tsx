@@ -11,11 +11,11 @@ const ocdMono = localFont({
   variable: "--font-ocd-mono",
 });
 
-let title = "MPLGPT – Real-Time AI Image Generator";
+let title = "Solana NFT AI Studio – Real-Time AI Image Generator";
 let description = "Generate images with AI in milliseconds";
-let url = "https://www.mplgpt.ai/";
-let ogimage = "https://www.mplgpt.ai/og-image.png";
-let sitename = "mplgpt.ai";
+let url = "https://www.mycandy.studio/";
+let ogimage = "https://www.mycandy.studio/pix-logo.svg";
+let sitename = "mycandy.studio";
 
 export const metadata: Metadata = {
   metadataBase: new URL(url),
