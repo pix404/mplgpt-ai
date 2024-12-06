@@ -2,20 +2,19 @@
 
 import {
   ConnectionProvider,
-  useWallet,
   WalletProvider,
 } from "@solana/wallet-adapter-react";
-import {
-  WalletModalProvider,
-  WalletMultiButton,
-} from "@solana/wallet-adapter-ant-design";
+import { WalletModalProvider } from "@solana/wallet-adapter-react-ui";
+import { PhantomWalletAdapter } from "@solana/wallet-adapter-phantom";
+import { SolflareWalletAdapter } from "@solana/wallet-adapter-solflare";
 import {
   QueryCache,
   QueryClient,
   QueryClientProvider,
 } from "@tanstack/react-query";
-import { ReactNode, Suspense } from "react";
+import { ReactNode, Suspense, useMemo } from "react";
 import toast, { Toaster } from "react-hot-toast";
+require("@solana/wallet-adapter-react-ui/styles.css");
 
 const queryClient = new QueryClient({
   queryCache: new QueryCache({
@@ -26,13 +25,21 @@ const queryClient = new QueryClient({
 });
 
 export default function Providers({ children }: { children: ReactNode }) {
+  const wallets = useMemo(
+    () => [
+      new PhantomWalletAdapter(),
+      new SolflareWalletAdapter(),
+    ],
+    []
+  );
+
   return (
     <ConnectionProvider
       endpoint={
         "https://solana-mainnet.core.chainstack.com/0c8257d8dca48ab362882555bc5b2d40"
       }
     >
-      <WalletProvider wallets={[]}>
+      <WalletProvider wallets={wallets} autoConnect>
         <WalletModalProvider>
           <QueryClientProvider client={queryClient}>
             <Suspense fallback={<div>Loading...</div>}>

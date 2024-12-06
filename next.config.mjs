@@ -1,13 +1,13 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  images: {
-    remotePatterns: [
-      {
-        protocol: "https",
-        hostname: "api.together.ai",
-      },
-    ],
+  reactStrictMode: true,
+  webpack: (config) => {
+    config.externals.push('pino-pretty', 'lokijs', 'encoding');
+    return config;
   },
+  experimental: {
+    appDir: true,
+  }
 };
 
 export default nextConfig;

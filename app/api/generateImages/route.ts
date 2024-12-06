@@ -10,9 +10,10 @@ export async function POST(req: Request) {
     let json = await req.json();
     console.log("Request body:", json);
 
-    let { prompt } = z
+    let { prompt, count } = z
       .object({
         prompt: z.string(),
+        count: z.number().min(1).max(10000).default(1),
         iterativeMode: z.boolean().optional(),
         userAPIKey: z.string().optional(),
         publicKey: z.string().optional(),
@@ -23,16 +24,16 @@ export async function POST(req: Request) {
     if (!process.env.TOGETHER_API_KEY || process.env.TOGETHER_API_KEY === 'tok_') {
       console.log("Using fallback API for image generation");
       try {
-        // Add random query parameter to prevent caching
-        const timestamp = Date.now();
-        const fallbackUrl = `${FALLBACK_API_URL}?t=${timestamp}`;
+        // Generate multiple fallback images
+        const images = Array.from({ length: count }, () => {
+          const timestamp = Date.now() + Math.random();
+          return {
+            url: `${FALLBACK_API_URL}?t=${timestamp}`,
+          };
+        });
         
-        // For demo purposes, we'll return a random image
         return new Response(
-          JSON.stringify({ 
-            url: fallbackUrl,
-            note: "Using fallback random image API (for demo purposes)"
-          }),
+          JSON.stringify(images),
           { 
             status: 200,
             headers: { 'Content-Type': 'application/json' }
@@ -41,7 +42,7 @@ export async function POST(req: Request) {
       } catch (fallbackError) {
         console.error("Fallback API Error:", fallbackError);
         return new Response(
-          JSON.stringify({ error: "Failed to generate image using fallback API" }),
+          JSON.stringify({ error: "Failed to generate images using fallback API" }),
           { 
             status: 500,
             headers: { 'Content-Type': 'application/json' }
@@ -57,22 +58,36 @@ export async function POST(req: Request) {
     });
     
     try {
-      const response = await client.images.create({
-        prompt,
-        model: "black-forest-labs/FLUX.1-schnell",
-        width: 1024,
-        height: 768,
-        steps: 3,
-      });
+      // Generate images in parallel with concurrency control
+      const CONCURRENT_REQUESTS = 5; // Adjust based on API limits
+      const images = [];
+      
+      for (let i = 0; i < count; i += CONCURRENT_REQUESTS) {
+        const batchSize = Math.min(CONCURRENT_REQUESTS, count - i);
+        const batchPromises = Array.from({ length: batchSize }, () =>
+          client.images.create({
+            prompt,
+            model: "black-forest-labs/FLUX.1-schnell",
+            width: 1024,
+            height: 768,
+            steps: 3,
+          })
+        );
 
-      console.log("Together API Response:", JSON.stringify(response, null, 2));
+        const batchResponses = await Promise.all(batchPromises);
+        const batchImages = batchResponses
+          .map(response => response.data?.[0])
+          .filter(Boolean);
+        
+        images.push(...batchImages);
+      }
 
-      if (!response.data?.[0]) {
-        throw new Error("No image data returned from Together API");
+      if (images.length === 0) {
+        throw new Error("No images were generated successfully");
       }
 
       return new Response(
-        JSON.stringify(response.data[0]),
+        JSON.stringify(images),
         { 
           status: 200,
           headers: { 'Content-Type': 'application/json' }
@@ -81,7 +96,7 @@ export async function POST(req: Request) {
     } catch (apiError: any) {
       console.error("Together API Error:", apiError);
       return new Response(
-        JSON.stringify({ error: apiError?.message || "Failed to generate image" }),
+        JSON.stringify({ error: apiError?.message || "Failed to generate images" }),
         { 
           status: 500,
           headers: { 'Content-Type': 'application/json' }
